@@ -1,9 +1,41 @@
 import { useState } from "react";
 import { FaPencilAlt, FaTrash, FaMapMarkerAlt, FaBars } from "react-icons/fa";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
+
+const MapEventHandler = ({ onMapClick, onMapDrop }) => {
+  const map = useMap();
+  
+  // Get the container element
+  const container = map.getContainer();
+  
+  // Add event listeners to the container
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  container.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const index = e.dataTransfer.getData("text/plain");
+    if (index) {
+      const point = map.mouseEventToLatLng(e);
+      onMapDrop(parseInt(index), point);
+    }
+  });
+  
+  // Handle regular map clicks
+  useMapEvents({
+    click: (e) => {
+      onMapClick(e);
+    }
+  });
+
+  return null;
+};
 
 const Item = ({
   item,
@@ -21,17 +53,26 @@ const Item = ({
   onDragStart,
   onDragOver,
   onDrop,
+  onDragEnd
 }) => {
   return (
     <li 
       className={`mb-4 rounded-lg bg-white p-4 shadow-md ${isSelectedForMapping ? 'ring-2 ring-blue-500' : ''}`}
-      draggable
-      onDragStart={(e) => onDragStart(e, index)}
+      draggable="true"
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", index.toString());
+        onDragStart(e, index);
+      }}
+      onDragEnd={onDragEnd}
       onDragOver={(e) => {
         e.preventDefault();
         onDragOver(index);
       }}
-      onDrop={(e) => onDrop(e, index)}
+      onDrop={(e) => {
+        e.preventDefault();
+        const sourceIndex = parseInt(e.dataTransfer.getData("text/plain"));
+        onDrop(sourceIndex, index);
+      }}
     >
       {isEditing ? (
         <form onSubmit={onEditSubmit} className="space-y-3">
@@ -100,16 +141,6 @@ const Item = ({
   );
 };
 
-const MapClickHandler = ({ onMapClick }) => {
-  useMapEvents({
-    click: (e) => {
-      console.log('Map clicked:', e.latlng);
-      onMapClick(e);
-    },
-  });
-  return null;
-};
-
 function App() {
   const [items, setItems] = useState([]);
   const [newItem, setNewItem] = useState("");
@@ -121,7 +152,6 @@ function App() {
   const [selectedForMapping, setSelectedForMapping] = useState(null);
   const [draggedIndex, setDraggedIndex] = useState(null);
 
-  // Existing handlers stay the same...
   const handleChange = (e) => {
     setNewItem(e.target.value);
   };
@@ -190,31 +220,40 @@ function App() {
     setSelectedForMapping(null);
   };
 
-  // New drag and drop handlers
+  const handleMapDrop = (index, latlng) => {
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      location: latlng
+    };
+    setItems(updatedItems);
+    setDraggedIndex(null);
+  };
+
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
+    document.body.classList.add('dragging-item');
+  };
+
+  const handleDragEnd = () => {
+    document.body.classList.remove('dragging-item');
   };
 
   const handleDragOver = (index) => {
     if (draggedIndex === null || draggedIndex === index) return;
-
-    const newItems = [...items];
-    const draggedItem = newItems[draggedIndex];
-    
-    // Remove item from old position and insert at new position
-    newItems.splice(draggedIndex, 1);
-    newItems.splice(index, 0, draggedItem);
-    
-    setItems(newItems);
-    setDraggedIndex(index);
   };
 
-  const handleDrop = (e) => {
+  const handleListDrop = (sourceIndex, targetIndex) => {
+    if (sourceIndex === targetIndex) return;
+    
+    const newItems = [...items];
+    const [removed] = newItems.splice(sourceIndex, 1);
+    newItems.splice(targetIndex, 0, removed);
+    setItems(newItems);
     setDraggedIndex(null);
   };
 
   const createCustomIcon = (index) => {
-    // Force new icon creation on reorder by including index in className
     return divIcon({
       className: `custom-marker marker-${index}`,
       html: `<div class="marker-index">${index + 1}</div>`,
@@ -226,7 +265,7 @@ function App() {
   return (
     <div className="flex h-screen w-screen">
       <div className="w-2/3 h-full">
-      <MapContainer
+        <MapContainer
           center={mapCenter}
           zoom={zoom}
           style={{ height: "100%", width: "100%" }}
@@ -236,11 +275,14 @@ function App() {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             maxZoom={19}
           />
-          <MapClickHandler onMapClick={handleMapClick} />
+          <MapEventHandler 
+            onMapClick={handleMapClick}
+            onMapDrop={handleMapDrop}
+          />
           {items.map((item, index) => 
             item.location && (
               <Marker 
-                key={`${index}-${item.text}-marker`} // More specific key
+                key={`${index}-${item.text}-marker`}
                 position={[item.location.lat, item.location.lng]}
                 icon={createCustomIcon(index)}
               >
@@ -294,7 +336,8 @@ function App() {
                 isSelectedForMapping={selectedForMapping === index}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
-                onDrop={handleDrop}
+                onDrop={handleListDrop}
+                onDragEnd={handleDragEnd}
               />
             ))}
           </ol>

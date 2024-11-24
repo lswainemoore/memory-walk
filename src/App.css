@@ -32,6 +32,19 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
+/* Dragging styles */
+.dragging-item {
+  cursor: grabbing !important;
+}
+
+li[draggable=true] {
+  cursor: grab;
+}
+
+li[draggable=true]:active {
+  cursor: grabbing;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
