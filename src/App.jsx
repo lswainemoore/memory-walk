@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { FaPencilAlt, FaTrash, FaMapMarkerAlt } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
-// Item component stays the same...
+// Item component stays exactly the same...
 const Item = ({
   item,
   index,
@@ -55,7 +56,7 @@ const Item = ({
       ) : (
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-lg">{item.text}</span>
+            <span className="text-lg">#{index + 1} {item.text}</span>
             {item.clue && (
               <span className="ml-2 text-gray-600">- {item.clue}</span>
             )}
@@ -85,7 +86,6 @@ const Item = ({
   );
 };
 
-// New component to handle map clicks
 const MapClickHandler = ({ onMapClick }) => {
   useMapEvents({
     click: (e) => {
@@ -106,7 +106,7 @@ function App() {
   const [zoom] = useState(13);
   const [selectedForMapping, setSelectedForMapping] = useState(null);
 
-  // All the handlers stay the same until handleMapClick...
+  // All handlers stay exactly the same...
   const handleChange = (e) => {
     setNewItem(e.target.value);
   };
@@ -175,6 +175,16 @@ function App() {
     setSelectedForMapping(null);
   };
 
+  // Function to create custom marker icon with index
+  const createCustomIcon = (index) => {
+    return divIcon({
+      className: 'custom-marker',
+      html: `<div class="marker-index">${index + 1}</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 24],
+    });
+  };
+
   return (
     <div className="flex h-screen w-screen">
       {/* Map Container */}
@@ -192,9 +202,13 @@ function App() {
           <MapClickHandler onMapClick={handleMapClick} />
           {items.map((item, index) => 
             item.location && (
-              <Marker key={index} position={[item.location.lat, item.location.lng]}>
+              <Marker 
+                key={index} 
+                position={[item.location.lat, item.location.lng]}
+                icon={createCustomIcon(index)}
+              >
                 <Popup>
-                  <strong>{index + 1}. {item.text}</strong>
+                  <strong>{item.text}</strong>
                   {item.clue && <p>{item.clue}</p>}
                 </Popup>
               </Marker>
@@ -203,7 +217,7 @@ function App() {
         </MapContainer>
       </div>
 
-      {/* Sidebar Panel stays the same... */}
+      {/* Sidebar Panel stays exactly the same... */}
       <div className="w-1/3 h-full bg-white p-6 shadow-xl overflow-auto">
         <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
           Memory Walk
