@@ -11,6 +11,7 @@ const Item = ({
   onEditSubmit,
   onEditClick,
   onDelete,
+  onCancelEdit,
 }) => {
   return (
     <li className="mb-4 rounded-lg bg-white p-4 shadow-md">
@@ -29,12 +30,21 @@ const Item = ({
             onChange={onEditChange}
             className="w-full rounded border p-2"
           />
-          <button
-            type="submit"
-            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-          >
-            Save
-          </button>
+          <div className="flex space-x-2">
+            <button
+              type="submit"
+              className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       ) : (
         <div className="flex items-center justify-between">
@@ -104,6 +114,12 @@ function App() {
     setEditClue(items[index].clue);
   };
 
+  const handleCancelEdit = () => {
+    setEditIndex(null);
+    setEditText("");
+    setEditClue("");
+  };
+
   const handleDelete = (index) => {
     const updatedItems = items.filter((_, i) => i !== index);
     setItems(updatedItems);
@@ -144,6 +160,7 @@ function App() {
               onEditSubmit={handleEditSubmit}
               onEditClick={() => handleEditClick(index)}
               onDelete={() => handleDelete(index)}
+              onCancelEdit={handleCancelEdit}
             />
           ))}
         </ol>
