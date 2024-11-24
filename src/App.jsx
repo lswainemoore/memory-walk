@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { FaPencilAlt, FaTrash } from "react-icons/fa";
-import { MapContainer, TileLayer } from "react-leaflet";
+import { FaPencilAlt, FaTrash, FaMapMarkerAlt } from "react-icons/fa";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
-// Item component stays exactly the same
+// Item component stays the same...
 const Item = ({
   item,
+  index,
   isEditing,
   editText,
   editClue,
@@ -15,9 +16,11 @@ const Item = ({
   onEditClick,
   onDelete,
   onCancelEdit,
+  onMapClick,
+  isSelectedForMapping,
 }) => {
   return (
-    <li className="mb-4 rounded-lg bg-white p-4 shadow-md">
+    <li className={`mb-4 rounded-lg bg-white p-4 shadow-md ${isSelectedForMapping ? 'ring-2 ring-blue-500' : ''}`}>
       {isEditing ? (
         <form onSubmit={onEditSubmit} className="space-y-3">
           <input
@@ -56,8 +59,17 @@ const Item = ({
             {item.clue && (
               <span className="ml-2 text-gray-600">- {item.clue}</span>
             )}
+            {item.location && (
+              <span className="ml-2 text-sm text-blue-500">
+                [{item.location.lat.toFixed(2)}, {item.location.lng.toFixed(2)}]
+              </span>
+            )}
           </div>
           <div className="flex space-x-2">
+            <FaMapMarkerAlt
+              onClick={() => onMapClick(index)}
+              className={`cursor-pointer ${isSelectedForMapping ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'}`}
+            />
             <FaPencilAlt
               onClick={onEditClick}
               className="cursor-pointer text-gray-500 hover:text-blue-500"
@@ -73,16 +85,28 @@ const Item = ({
   );
 };
 
+// New component to handle map clicks
+const MapClickHandler = ({ onMapClick }) => {
+  useMapEvents({
+    click: (e) => {
+      console.log('Map clicked:', e.latlng);
+      onMapClick(e);
+    },
+  });
+  return null;
+};
+
 function App() {
   const [items, setItems] = useState([]);
   const [newItem, setNewItem] = useState("");
   const [editIndex, setEditIndex] = useState(null);
   const [editText, setEditText] = useState("");
   const [editClue, setEditClue] = useState("");
-  const [mapCenter] = useState([51.505, -0.09]); // Default to London
+  const [mapCenter] = useState([51.505, -0.09]);
   const [zoom] = useState(13);
+  const [selectedForMapping, setSelectedForMapping] = useState(null);
 
-  // All handlers stay exactly the same
+  // All the handlers stay the same until handleMapClick...
   const handleChange = (e) => {
     setNewItem(e.target.value);
   };
@@ -99,7 +123,7 @@ function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (newItem.trim() === "") return;
-    setItems([...items, { text: newItem, clue: "" }]);
+    setItems([...items, { text: newItem, clue: "", location: null }]);
     setNewItem("");
   };
 
@@ -107,7 +131,11 @@ function App() {
     e.preventDefault();
     if (editIndex === null) return;
     const updatedItems = [...items];
-    updatedItems[editIndex] = { text: editText, clue: editClue };
+    updatedItems[editIndex] = {
+      ...updatedItems[editIndex],
+      text: editText,
+      clue: editClue
+    };
     setItems(updatedItems);
     setEditIndex(null);
     setEditText("");
@@ -131,9 +159,25 @@ function App() {
     setItems(updatedItems);
   };
 
+  const handleMapItemSelect = (index) => {
+    setSelectedForMapping(selectedForMapping === index ? null : index);
+  };
+
+  const handleMapClick = (e) => {
+    if (selectedForMapping === null) return;
+    
+    const updatedItems = [...items];
+    updatedItems[selectedForMapping] = {
+      ...updatedItems[selectedForMapping],
+      location: e.latlng
+    };
+    setItems(updatedItems);
+    setSelectedForMapping(null);
+  };
+
   return (
     <div className="flex h-screen w-screen">
-      {/* Map Container - Takes up 2/3 of the space */}
+      {/* Map Container */}
       <div className="w-2/3 h-full">
         <MapContainer
           center={mapCenter}
@@ -145,10 +189,21 @@ function App() {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             maxZoom={19}
           />
+          <MapClickHandler onMapClick={handleMapClick} />
+          {items.map((item, index) => 
+            item.location && (
+              <Marker key={index} position={[item.location.lat, item.location.lng]}>
+                <Popup>
+                  <strong>{index + 1}. {item.text}</strong>
+                  {item.clue && <p>{item.clue}</p>}
+                </Popup>
+              </Marker>
+            )
+          )}
         </MapContainer>
       </div>
 
-      {/* Sidebar Panel - Takes up 1/3 of the space */}
+      {/* Sidebar Panel stays the same... */}
       <div className="w-1/3 h-full bg-white p-6 shadow-xl overflow-auto">
         <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
           Memory Walk
@@ -175,6 +230,7 @@ function App() {
             {items.map((item, index) => (
               <Item
                 key={index}
+                index={index}
                 item={item}
                 isEditing={editIndex === index}
                 editText={editText}
@@ -184,6 +240,8 @@ function App() {
                 onEditClick={() => handleEditClick(index)}
                 onDelete={() => handleDelete(index)}
                 onCancelEdit={handleCancelEdit}
+                onMapClick={handleMapItemSelect}
+                isSelectedForMapping={selectedForMapping === index}
               />
             ))}
           </ol>
