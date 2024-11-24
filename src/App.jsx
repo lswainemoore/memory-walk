@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { FaPencilAlt, FaTrash, FaMapMarkerAlt } from "react-icons/fa";
+import { FaPencilAlt, FaTrash, FaMapMarkerAlt, FaBars } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
-// Item component stays exactly the same...
 const Item = ({
   item,
   index,
@@ -19,9 +18,21 @@ const Item = ({
   onCancelEdit,
   onMapClick,
   isSelectedForMapping,
+  onDragStart,
+  onDragOver,
+  onDrop,
 }) => {
   return (
-    <li className={`mb-4 rounded-lg bg-white p-4 shadow-md ${isSelectedForMapping ? 'ring-2 ring-blue-500' : ''}`}>
+    <li 
+      className={`mb-4 rounded-lg bg-white p-4 shadow-md ${isSelectedForMapping ? 'ring-2 ring-blue-500' : ''}`}
+      draggable
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver(index);
+      }}
+      onDrop={(e) => onDrop(e, index)}
+    >
       {isEditing ? (
         <form onSubmit={onEditSubmit} className="space-y-3">
           <input
@@ -55,16 +66,19 @@ const Item = ({
         </form>
       ) : (
         <div className="flex items-center justify-between">
-          <div>
-            <span className="text-lg">#{index + 1} {item.text}</span>
-            {item.clue && (
-              <span className="ml-2 text-gray-600">- {item.clue}</span>
-            )}
-            {item.location && (
-              <span className="ml-2 text-sm text-blue-500">
-                [{item.location.lat.toFixed(2)}, {item.location.lng.toFixed(2)}]
-              </span>
-            )}
+          <div className="flex items-center gap-2">
+            <FaBars className="cursor-move text-gray-400" />
+            <div>
+              <span className="text-lg">#{index + 1} {item.text}</span>
+              {item.clue && (
+                <span className="ml-2 text-gray-600">- {item.clue}</span>
+              )}
+              {item.location && (
+                <span className="ml-2 text-sm text-blue-500">
+                  [{item.location.lat.toFixed(2)}, {item.location.lng.toFixed(2)}]
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex space-x-2">
             <FaMapMarkerAlt
@@ -105,8 +119,9 @@ function App() {
   const [mapCenter] = useState([51.505, -0.09]);
   const [zoom] = useState(13);
   const [selectedForMapping, setSelectedForMapping] = useState(null);
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
-  // All handlers stay exactly the same...
+  // Existing handlers stay the same...
   const handleChange = (e) => {
     setNewItem(e.target.value);
   };
@@ -175,10 +190,33 @@ function App() {
     setSelectedForMapping(null);
   };
 
-  // Function to create custom marker icon with index
+  // New drag and drop handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (index) => {
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newItems = [...items];
+    const draggedItem = newItems[draggedIndex];
+    
+    // Remove item from old position and insert at new position
+    newItems.splice(draggedIndex, 1);
+    newItems.splice(index, 0, draggedItem);
+    
+    setItems(newItems);
+    setDraggedIndex(index);
+  };
+
+  const handleDrop = (e) => {
+    setDraggedIndex(null);
+  };
+
   const createCustomIcon = (index) => {
+    // Force new icon creation on reorder by including index in className
     return divIcon({
-      className: 'custom-marker',
+      className: `custom-marker marker-${index}`,
       html: `<div class="marker-index">${index + 1}</div>`,
       iconSize: [24, 24],
       iconAnchor: [12, 24],
@@ -187,9 +225,8 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen">
-      {/* Map Container */}
       <div className="w-2/3 h-full">
-        <MapContainer
+      <MapContainer
           center={mapCenter}
           zoom={zoom}
           style={{ height: "100%", width: "100%" }}
@@ -203,12 +240,12 @@ function App() {
           {items.map((item, index) => 
             item.location && (
               <Marker 
-                key={index} 
+                key={`${index}-${item.text}-marker`} // More specific key
                 position={[item.location.lat, item.location.lng]}
                 icon={createCustomIcon(index)}
               >
                 <Popup>
-                  <strong>{item.text}</strong>
+                  <strong>#{index + 1} {item.text}</strong>
                   {item.clue && <p>{item.clue}</p>}
                 </Popup>
               </Marker>
@@ -217,7 +254,6 @@ function App() {
         </MapContainer>
       </div>
 
-      {/* Sidebar Panel stays exactly the same... */}
       <div className="w-1/3 h-full bg-white p-6 shadow-xl overflow-auto">
         <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
           Memory Walk
@@ -243,7 +279,7 @@ function App() {
           <ol className="space-y-4">
             {items.map((item, index) => (
               <Item
-                key={index}
+                key={`${index}-${item.text}`}
                 index={index}
                 item={item}
                 isEditing={editIndex === index}
@@ -256,6 +292,9 @@ function App() {
                 onCancelEdit={handleCancelEdit}
                 onMapClick={handleMapItemSelect}
                 isSelectedForMapping={selectedForMapping === index}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
               />
             ))}
           </ol>
