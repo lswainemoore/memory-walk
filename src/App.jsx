@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { FaPencilAlt, FaTrash } from "react-icons/fa";
+import { MapContainer, TileLayer } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import "./App.css";
 
+// Item component stays exactly the same
 const Item = ({
   item,
   isEditing,
@@ -76,7 +79,10 @@ function App() {
   const [editIndex, setEditIndex] = useState(null);
   const [editText, setEditText] = useState("");
   const [editClue, setEditClue] = useState("");
+  const [mapCenter] = useState([51.505, -0.09]); // Default to London
+  const [zoom] = useState(13);
 
+  // All handlers stay exactly the same
   const handleChange = (e) => {
     setNewItem(e.target.value);
   };
@@ -126,8 +132,24 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="mx-auto max-w-2xl">
+    <div className="flex h-screen w-screen">
+      {/* Map Container - Takes up 2/3 of the space */}
+      <div className="w-2/3 h-full">
+        <MapContainer
+          center={mapCenter}
+          zoom={zoom}
+          style={{ height: "100%", width: "100%" }}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            maxZoom={19}
+          />
+        </MapContainer>
+      </div>
+
+      {/* Sidebar Panel - Takes up 1/3 of the space */}
+      <div className="w-1/3 h-full bg-white p-6 shadow-xl overflow-auto">
         <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
           Memory Walk
         </h1>
@@ -148,22 +170,24 @@ function App() {
             </button>
           </form>
         </div>
-        <ol className="space-y-4">
-          {items.map((item, index) => (
-            <Item
-              key={index}
-              item={item}
-              isEditing={editIndex === index}
-              editText={editText}
-              editClue={editClue}
-              onEditChange={handleEditChange}
-              onEditSubmit={handleEditSubmit}
-              onEditClick={() => handleEditClick(index)}
-              onDelete={() => handleDelete(index)}
-              onCancelEdit={handleCancelEdit}
-            />
-          ))}
-        </ol>
+        <div className="h-[calc(100vh-20rem)] overflow-y-auto">
+          <ol className="space-y-4">
+            {items.map((item, index) => (
+              <Item
+                key={index}
+                item={item}
+                isEditing={editIndex === index}
+                editText={editText}
+                editClue={editClue}
+                onEditChange={handleEditChange}
+                onEditSubmit={handleEditSubmit}
+                onEditClick={() => handleEditClick(index)}
+                onDelete={() => handleDelete(index)}
+                onCancelEdit={handleCancelEdit}
+              />
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );
