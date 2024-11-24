@@ -1,28 +1,33 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-
-export default tseslint.config(
-  { ignores: ['dist'] },
-  {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-    },
-    plugins: {
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
-    },
-    rules: {
-      ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
-    },
+// .eslintrc.js
+export default {
+  root: true,
+  env: {
+    browser: true,
+    es2022: true,
   },
-)
+  extends: [
+    '@eslint/js/recommended',
+    'plugin:react-hooks/recommended',
+  ],
+  parserOptions: {
+    ecmaVersion: 2023,
+    sourceType: 'module'
+  },
+  rules: {
+    // Similar to noUnusedLocals
+    'no-unused-vars': ['error', { 
+      vars: 'all',
+      args: 'after-used',
+      ignoreRestSiblings: true
+    }],
+    // Similar to noUnusedParameters
+    'no-unused-params': 'error',
+    // Similar to noFallthroughCasesInSwitch
+    'no-fallthrough': 'error',
+    // Additional recommended rules for React
+    'react-refresh/only-export-components': [
+      'warn',
+      { allowConstantExport: true },
+    ],
+  },
+}
