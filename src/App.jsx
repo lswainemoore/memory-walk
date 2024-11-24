@@ -13,35 +13,48 @@ const Item = ({
   onDelete,
 }) => {
   return (
-    <li>
+    <li className="mb-4 rounded-lg bg-white p-4 shadow-md">
       {isEditing ? (
-        <form onSubmit={onEditSubmit}>
+        <form onSubmit={onEditSubmit} className="space-y-3">
           <input
             type="text"
             name="editText"
             value={editText}
             onChange={onEditChange}
+            className="w-full rounded border p-2"
           />
           <textarea
             name="editClue"
             value={editClue}
             onChange={onEditChange}
+            className="w-full rounded border p-2"
           />
-          <button type="submit">Save</button>
+          <button
+            type="submit"
+            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+          >
+            Save
+          </button>
         </form>
       ) : (
-        <>
-          <span>{item.text}</span>
-          {item.clue && <span> - {item.clue}</span>}
-          <FaPencilAlt
-            onClick={onEditClick}
-            style={{ cursor: "pointer", marginLeft: "10px" }}
-          />
-          <FaTrash
-            onClick={onDelete}
-            style={{ cursor: "pointer", marginLeft: "10px" }}
-          />
-        </>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-lg">{item.text}</span>
+            {item.clue && (
+              <span className="ml-2 text-gray-600">- {item.clue}</span>
+            )}
+          </div>
+          <div className="flex space-x-2">
+            <FaPencilAlt
+              onClick={onEditClick}
+              className="cursor-pointer text-gray-500 hover:text-blue-500"
+            />
+            <FaTrash
+              onClick={onDelete}
+              className="cursor-pointer text-gray-500 hover:text-red-500"
+            />
+          </div>
+        </div>
       )}
     </li>
   );
@@ -97,35 +110,45 @@ function App() {
   };
 
   return (
-    <>
-      <h1>Memory Walk</h1>
-      <div className="card">
-        <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Item"
-            value={newItem}
-            onChange={handleChange}
-          />
-          <button type="submit">Add</button>
-        </form>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
+          Memory Walk
+        </h1>
+        <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+          <form onSubmit={handleSubmit} className="flex space-x-4">
+            <input
+              type="text"
+              placeholder="Item"
+              value={newItem}
+              onChange={handleChange}
+              className="flex-1 rounded border p-2 focus:border-blue-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="rounded bg-blue-500 px-6 py-2 text-white hover:bg-blue-600"
+            >
+              Add
+            </button>
+          </form>
+        </div>
+        <ol className="space-y-4">
+          {items.map((item, index) => (
+            <Item
+              key={index}
+              item={item}
+              isEditing={editIndex === index}
+              editText={editText}
+              editClue={editClue}
+              onEditChange={handleEditChange}
+              onEditSubmit={handleEditSubmit}
+              onEditClick={() => handleEditClick(index)}
+              onDelete={() => handleDelete(index)}
+            />
+          ))}
+        </ol>
       </div>
-      <ol className="items">
-        {items.map((item, index) => (
-          <Item
-            key={index}
-            item={item}
-            isEditing={editIndex === index}
-            editText={editText}
-            editClue={editClue}
-            onEditChange={handleEditChange}
-            onEditSubmit={handleEditSubmit}
-            onEditClick={() => handleEditClick(index)}
-            onDelete={() => handleDelete(index)}
-          />
-        ))}
-      </ol>
-    </>
+    </div>
   );
 }
 
