@@ -735,7 +735,7 @@ const Item = ({
             className="flex-grow cursor-pointer"
             onClick={() => onItemClick(index)}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex text-start justify-between">
               <span className="text-lg font-medium">{item.text}</span>
               <div className="flex items-center space-x-2">
                 <div className="relative group">
@@ -746,8 +746,10 @@ const Item = ({
                     }}
                     className={`cursor-pointer transition-colors duration-200 ${
                       isSelectedForMapping
-                        ? "text-blue-500"
-                        : "text-gray-400 hover:text-blue-500"
+                        ? "text-yellow-500"
+                        : item.location != null
+                          ? "text-blue-500"
+                          : "text-gray-400"
                     }`}
                   />
                   {item.location && (
@@ -776,7 +778,7 @@ const Item = ({
               </div>
             </div>
             {item.clue && (
-              <div className="mt-3 prose prose-sm max-w-none border-t pt-3">
+              <div className="mt-3 prose prose-sm max-w-none border-t pt-3 text-start">
                 <ReactMarkdown
                   urlTransform={(value) => {
                     // If it's a stored image URL, leave it as is
