@@ -128,6 +128,7 @@ const MobileDrawer = ({
               handleImageUpload={handleImageUpload}
               totalItems={items.length}
               onListDrop={onListDrop}
+              isMobile={true}
             />
           </div>
         </>
@@ -198,6 +199,7 @@ const Item = ({
   onDragEnd,
   onItemClick,
   handleImageUpload,
+  isMobile,
   totalItems,
   onListDrop,
 }) => {
@@ -301,15 +303,18 @@ const Item = ({
         </form>
       ) : (
         <div className="flex items-start gap-4">
-          {window.innerWidth < 768 ? (
+          {isMobile ? (
             <PositionSelector
               currentPosition={index}
               totalItems={totalItems}
               onReorder={(from, to) => onListDrop(from, to)} // Use onListDrop here
             />
           ) : (
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
-              {index + 1}
+            <div className="flex items-center gap-2">
+              <FaBars className="cursor-move text-gray-400" />
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
+                {index + 1}
+              </div>
             </div>
           )}
           <div
@@ -317,10 +322,7 @@ const Item = ({
             onClick={() => onItemClick(index)}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FaBars className="cursor-move text-gray-400" />
-                <span className="text-lg font-medium">{item.text}</span>
-              </div>
+              <span className="text-lg font-medium">{item.text}</span>
               <div className="flex items-center space-x-2">
                 <div className="relative group">
                   <FaMapMarkerAlt
@@ -641,7 +643,7 @@ function App() {
           className="h-[calc(100vh-20rem)] overflow-y-auto"
           ref={itemsContainerRef}
         >
-          <ol className="space-y-4">
+          <ol className="space-y-4 m-1">
             {items.map((item, index) => (
               <Item
                 key={item.id}
