@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FaPencilAlt, FaTrash, FaMapMarkerAlt, FaBars } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import {
@@ -70,6 +70,7 @@ const Item = ({
   onDragStart,
   onDrop,
   onDragEnd,
+  handleImageUpload,
 }) => {
   return (
     <li
@@ -118,18 +119,7 @@ const Item = ({
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      try {
-                        const base64 = await fileToBase64(file);
-                        const imageMarkdown = `\n![${file.name}](${base64})\n`;
-                        onEditChange({
-                          target: {
-                            name: "editClue",
-                            value: editClue + imageMarkdown,
-                          },
-                        });
-                      } catch (error) {
-                        console.error("Error processing image:", error);
-                      }
+                      await handleImageUpload(file, editClue, onEditChange);
                     }
                   }}
                 />
@@ -241,6 +231,32 @@ function App() {
   const [zoom] = useState(13);
   const [selectedForMapping, setSelectedForMapping] = useState(null);
   const [draggedIndex, setDraggedIndex] = useState(null);
+
+  const [tempUrls, setTempUrls] = useState(new Set()); // Track URLs to revoke
+
+  // Clean up URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      tempUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [tempUrls]);
+
+  const handleImageUpload = async (file, editClue, onEditChange) => {
+    try {
+      const tempUrl = URL.createObjectURL(file);
+      setTempUrls((prev) => new Set(prev).add(tempUrl));
+
+      const imageMarkdown = `\n![${file.name}](${tempUrl})\n`;
+      onEditChange({
+        target: {
+          name: "editClue",
+          value: editClue + imageMarkdown,
+        },
+      });
+    } catch (error) {
+      console.error("Error processing image:", error);
+    }
+  };
 
   const handleChange = (e) => {
     setNewItem(e.target.value);
@@ -451,6 +467,7 @@ function App() {
                 onDragStart={handleDragStart}
                 onDrop={handleListDrop}
                 onDragEnd={handleDragEnd}
+                handleImageUpload={handleImageUpload}
               />
             ))}
           </ol>
