@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { FaPencilAlt, FaTrash, FaMapMarkerAlt, FaBars } from "react-icons/fa";
+import {
+  FaPencilAlt,
+  FaTrash,
+  FaMapMarkerAlt,
+  FaBars,
+  FaFileExport,
+  FaFileUpload,
+  FaRedoAlt,
+} from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import {
   MapContainer,
@@ -267,7 +275,7 @@ const importData = async (file) => {
   }
 };
 
-const ImportExportButtons = ({ onImport }) => {
+const ControlButtons = ({ onImport, onReset, items }) => {
   const fileInputRef = useRef();
   const [isExporting, setIsExporting] = useState(false);
 
@@ -281,7 +289,7 @@ const ImportExportButtons = ({ onImport }) => {
   };
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-1">
       <input
         type="file"
         ref={fileInputRef}
@@ -302,45 +310,40 @@ const ImportExportButtons = ({ onImport }) => {
       />
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-600 hover:border-blue-800 rounded transition-colors duration-200"
+        className="p-2"
+        title="Import"
       >
-        Import
+        <FaFileUpload />
       </button>
       <button
         onClick={handleExportClick}
         disabled={isExporting}
-        className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-600 hover:border-blue-800 rounded transition-colors duration-200 disabled:opacity-50"
+        className="p-2"
+        title="Export"
       >
-        {isExporting ? "Exporting..." : "Export"}
+        <FaFileExport />
       </button>
+      {items?.length > 0 && (
+        <button onClick={onReset} className="p-2" title="Reset">
+          <FaRedoAlt />
+        </button>
+      )}
     </div>
   );
 };
 
-const ResetButton = ({ onReset, items }) => {
-  return (
-    <>
-      {items?.length > 0 && (
-        <button
-          onClick={onReset}
-          className="px-4 py-2 text-sm text-red-600 hover:text-red-800 border border-red-600 hover:border-red-800 rounded transition-colors duration-200"
-        >
-          Reset
-        </button>
-      )}
-    </>
-  );
-};
-
-const MobileToolbar = ({ resetButton, handleImport }) => {
+const MobileToolbar = ({ onImport, onReset, items }) => {
   return (
     <div className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b md:hidden">
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-800">Memory Walk</h1>
           <div className="flex items-center gap-2">
-            <ImportExportButtons onImport={handleImport} />
-            {resetButton}
+            <ControlButtons
+              onImport={onImport}
+              onReset={onReset}
+              items={items}
+            />
           </div>
         </div>
       </div>
@@ -1049,8 +1052,6 @@ function App() {
     }
   };
 
-  const resetButton = <ResetButton onReset={handleReset} items={items} />;
-
   return (
     <div className="flex h-screen w-screen">
       <div className="flex-grow h-full md:w-2/3">
@@ -1082,15 +1083,15 @@ function App() {
           )}
         </MapContainer>
       </div>
-
       {/* Desktop Sidebar */}
       <div className="hidden md:block md:w-1/3 bg-white p-6 shadow-xl overflow-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-4xl font-bold text-gray-800">Memory Walk</h1>
-          {resetButton}
-        </div>
-        <div className="mb-4 flex justify-end">
-          <ImportExportButtons onImport={handleImport} />
+          <ControlButtons
+            onImport={handleImport}
+            onReset={handleReset}
+            items={items}
+          />
         </div>
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <form onSubmit={handleSubmit} className="flex space-x-4">
@@ -1141,8 +1142,11 @@ function App() {
           </ol>
         </div>
       </div>
-
-      <MobileToolbar resetButton={resetButton} handleImport={handleImport} />
+      <MobileToolbar
+        onImport={handleImport}
+        onReset={handleReset}
+        items={items}
+      />
       <MobileDrawer
         items={items}
         selectedId={selectedId}
@@ -1163,7 +1167,6 @@ function App() {
         onSelect={onSelect}
         onListDrop={handleListDrop}
       />
-
       {isLoading && (
         <div className="loading-overlay">
           <div className="loading-spinner" />
