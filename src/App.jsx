@@ -1,23 +1,40 @@
 import { useState } from "react";
 import { FaPencilAlt, FaTrash, FaMapMarkerAlt, FaBars } from "react-icons/fa";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
+import ReactMarkdown from "react-markdown";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMapEvents,
+  useMap,
+} from "react-leaflet";
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   const map = useMap();
-  
+
   // Get the container element
   const container = map.getContainer();
-  
+
   // Add event listeners to the container
-  container.addEventListener('dragover', (e) => {
+  container.addEventListener("dragover", (e) => {
     e.preventDefault();
     e.stopPropagation();
   });
-  
-  container.addEventListener('drop', (e) => {
+
+  container.addEventListener("drop", (e) => {
     e.preventDefault();
     e.stopPropagation();
     const index = e.dataTransfer.getData("text/plain");
@@ -26,12 +43,12 @@ const MapEventHandler = ({ onMapClick, onMapDrop }) => {
       onMapDrop(parseInt(index), point);
     }
   });
-  
+
   // Handle regular map clicks
   useMapEvents({
     click: (e) => {
       onMapClick(e);
-    }
+    },
   });
 
   return null;
@@ -52,20 +69,18 @@ const Item = ({
   isSelectedForMapping,
   onDragStart,
   onDrop,
-  onDragEnd
+  onDragEnd,
 }) => {
   return (
-    <li 
-      className={`mb-4 rounded-lg bg-white p-4 shadow-md ${isSelectedForMapping ? 'ring-2 ring-blue-500' : ''}`}
+    <li
+      className={`mb-4 rounded-lg bg-white p-4 shadow-md ${isSelectedForMapping ? "ring-2 ring-blue-500" : ""}`}
       draggable="true"
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", index.toString());
         onDragStart(e, index);
       }}
       onDragEnd={onDragEnd}
-      onDragOver={(e) => {
-        e.preventDefault();
-      }}
+      onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
         const sourceIndex = parseInt(e.dataTransfer.getData("text/plain"));
@@ -80,13 +95,73 @@ const Item = ({
             value={editText}
             onChange={onEditChange}
             className="w-full rounded border p-2"
+            placeholder="Item title"
           />
-          <textarea
-            name="editClue"
-            value={editClue}
-            onChange={onEditChange}
-            className="w-full rounded border p-2"
-          />
+          <div className="space-y-2">
+            <div className="text-sm text-gray-600">
+              Clue supports Markdown and images
+            </div>
+            <textarea
+              name="editClue"
+              value={editClue}
+              onChange={onEditChange}
+              className="w-full h-32 rounded border p-2 font-mono text-sm"
+              placeholder="Add details with Markdown..."
+            />
+            <div className="flex space-x-2">
+              <label className="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">
+                📁 Add Image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      try {
+                        const base64 = await fileToBase64(file);
+                        const imageMarkdown = `\n![${file.name}](${base64})\n`;
+                        onEditChange({
+                          target: {
+                            name: "editClue",
+                            value: editClue + imageMarkdown,
+                          },
+                        });
+                      } catch (error) {
+                        console.error("Error processing image:", error);
+                      }
+                    }
+                  }}
+                />
+              </label>
+              <label className="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">
+                📷 Take Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      try {
+                        const base64 = await fileToBase64(file);
+                        const imageMarkdown = `\n![Photo](${base64})\n`;
+                        onEditChange({
+                          target: {
+                            name: "editClue",
+                            value: editClue + imageMarkdown,
+                          },
+                        });
+                      } catch (error) {
+                        console.error("Error processing image:", error);
+                      }
+                    }
+                  }}
+                />
+              </label>
+            </div>
+          </div>
           <div className="flex space-x-2">
             <button
               type="submit"
@@ -105,24 +180,41 @@ const Item = ({
         </form>
       ) : (
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FaBars className="cursor-move text-gray-400" />
-            <div>
-              <span className="text-lg">#{index + 1} {item.text}</span>
+          <div className="flex items-center gap-2 w-full">
+            <FaBars className="cursor-move text-gray-400 flex-shrink-0" />
+            <div className="w-full">
+              <span className="text-lg">
+                #{index + 1} {item.text}
+              </span>
               {item.clue && (
-                <span className="ml-2 text-gray-600">- {item.clue}</span>
+                <div className="mt-2 prose prose-sm max-w-none">
+                  <ReactMarkdown
+                    // components={{
+                    //   img: ({ node, ...props }) => (
+                    //     <img
+                    //       {...props}
+                    //       className="max-w-full h-auto rounded-lg shadow-sm"
+                    //     />
+                    //   ),
+                    // }}
+                    urlTransform={(value) => value}
+                  >
+                    {item.clue}
+                  </ReactMarkdown>
+                </div>
               )}
               {item.location && (
-                <span className="ml-2 text-sm text-blue-500">
-                  [{item.location.lat.toFixed(2)}, {item.location.lng.toFixed(2)}]
+                <span className="block mt-1 text-sm text-blue-500">
+                  [{item.location.lat.toFixed(2)},{" "}
+                  {item.location.lng.toFixed(2)}]
                 </span>
               )}
             </div>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 ml-4 flex-shrink-0">
             <FaMapMarkerAlt
               onClick={() => onMapClick(index)}
-              className={`cursor-pointer ${isSelectedForMapping ? 'text-blue-500' : 'text-gray-500 hover:text-blue-500'}`}
+              className={`cursor-pointer ${isSelectedForMapping ? "text-blue-500" : "text-gray-500 hover:text-blue-500"}`}
             />
             <FaPencilAlt
               onClick={onEditClick}
@@ -172,13 +264,14 @@ function App() {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-    if (editIndex === null || editIndex < 0 || editIndex >= items.length) return;
+    if (editIndex === null || editIndex < 0 || editIndex >= items.length)
+      return;
 
     const updatedItems = [...items];
     updatedItems[editIndex] = {
       ...items[editIndex],
       text: editText,
-      clue: editClue
+      clue: editClue,
     };
     setItems(updatedItems);
     setEditIndex(null);
@@ -211,16 +304,19 @@ function App() {
   };
 
   const handleMapClick = (e) => {
-    if (selectedForMapping === null || 
-        selectedForMapping < 0 || 
-        selectedForMapping >= items.length) return;
-    
+    if (
+      selectedForMapping === null ||
+      selectedForMapping < 0 ||
+      selectedForMapping >= items.length
+    )
+      return;
+
     const updatedItems = [...items];
     if (!updatedItems[selectedForMapping]) return;
 
     updatedItems[selectedForMapping] = {
       ...updatedItems[selectedForMapping],
-      location: e.latlng
+      location: e.latlng,
     };
     setItems(updatedItems);
     setSelectedForMapping(null);
@@ -228,13 +324,13 @@ function App() {
 
   const handleMapDrop = (index, latlng) => {
     if (index < 0 || index >= items.length) return;
-    
+
     const updatedItems = [...items];
     if (!updatedItems[index]) return;
 
     updatedItems[index] = {
       ...updatedItems[index],
-      location: latlng
+      location: latlng,
     };
     setItems(updatedItems);
     setDraggedIndex(null);
@@ -242,22 +338,25 @@ function App() {
 
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
-    document.body.classList.add('dragging-item');
+    document.body.classList.add("dragging-item");
   };
-  
+
   const handleDragEnd = () => {
-    document.body.classList.remove('dragging-item');
+    document.body.classList.remove("dragging-item");
     setDraggedIndex(null);
   };
-  
+
   // This is the key fix - simplify the list drop logic
   const handleListDrop = (sourceIndex, targetIndex) => {
-    if (sourceIndex === targetIndex || 
-        sourceIndex < 0 || 
-        targetIndex < 0 || 
-        sourceIndex >= items.length || 
-        targetIndex >= items.length) return;
-      
+    if (
+      sourceIndex === targetIndex ||
+      sourceIndex < 0 ||
+      targetIndex < 0 ||
+      sourceIndex >= items.length ||
+      targetIndex >= items.length
+    )
+      return;
+
     const newItems = [...items];
     const [movedItem] = newItems.splice(sourceIndex, 1);
     newItems.splice(targetIndex, 0, movedItem);
@@ -286,23 +385,27 @@ function App() {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             maxZoom={19}
           />
-          <MapEventHandler 
+          <MapEventHandler
             onMapClick={handleMapClick}
             onMapDrop={handleMapDrop}
           />
-          {items.map((item, index) => 
-            item && item.location && (
-              <Marker 
-                key={`${index}-${item.text}-marker`}
-                position={[item.location.lat, item.location.lng]}
-                icon={createCustomIcon(index)}
-              >
-                <Popup>
-                  <strong>#{index + 1} {item.text}</strong>
-                  {item.clue && <p>{item.clue}</p>}
-                </Popup>
-              </Marker>
-            )
+          {items.map(
+            (item, index) =>
+              item &&
+              item.location && (
+                <Marker
+                  key={`${index}-${item.text}-marker`}
+                  position={[item.location.lat, item.location.lng]}
+                  icon={createCustomIcon(index)}
+                >
+                  <Popup>
+                    <strong>
+                      #{index + 1} {item.text}
+                    </strong>
+                    {item.clue && <p>{item.clue}</p>}
+                  </Popup>
+                </Marker>
+              )
           )}
         </MapContainer>
       </div>
