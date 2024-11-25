@@ -13,6 +13,71 @@ import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
+const MobileDrawer = ({
+  items,
+  selectedId,
+  newItemName,
+  onNewItemNameChange,
+  onNewItemSubmit,
+  onEditChange,
+  onEditSubmit,
+  onEditClick,
+  onDelete,
+  onCancelEdit,
+  onMapClick,
+  selectedForMapping,
+  handleImageUpload,
+  editIndex,
+  editText,
+  editClue,
+}) => {
+  const selectedItem = items.find((item) => item.id === selectedId);
+  const selectedIndex = items.findIndex((item) => item.id === selectedId);
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white shadow-lg md:hidden">
+      <div className="border-b p-4">
+        <form onSubmit={onNewItemSubmit} className="flex gap-2">
+          <input
+            type="text"
+            value={newItemName}
+            onChange={onNewItemNameChange}
+            placeholder="Add new item"
+            className="flex-1 rounded border p-2 focus:border-blue-500 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+          >
+            Add
+          </button>
+        </form>
+      </div>
+
+      {selectedItem && (
+        <div className="max-h-[50vh] overflow-y-auto">
+          <Item
+            item={selectedItem}
+            index={selectedIndex}
+            isEditing={editIndex === selectedIndex}
+            editText={editText}
+            editClue={editClue}
+            onEditChange={onEditChange}
+            onEditSubmit={onEditSubmit}
+            onEditClick={() => onEditClick(selectedIndex)}
+            onDelete={() => onDelete(selectedIndex)}
+            onCancelEdit={onCancelEdit}
+            onMapClick={() => onMapClick(selectedIndex)}
+            isSelectedForMapping={selectedForMapping === selectedIndex}
+            isSelected={true}
+            handleImageUpload={handleImageUpload}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   const map = useMap();
 
@@ -449,23 +514,22 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen">
-      <div className="w-2/3 h-full">
+      <div className="flex-grow h-full md:w-2/3">
         <MapContainer
           center={mapCenter}
           zoom={zoom}
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            maxZoom={19}
           />
           <MapEventHandler
             onMapClick={handleMapClick}
             onMapDrop={handleMapDrop}
           />
           {items.map(
-            (item, index) =>
+            (item) =>
               item?.location && (
                 <Marker
                   key={item.id}
@@ -480,7 +544,8 @@ function App() {
         </MapContainer>
       </div>
 
-      <div className="w-1/3 h-full bg-white p-6 shadow-xl overflow-auto">
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block md:w-1/3 bg-white p-6 shadow-xl overflow-auto">
         <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
           Memory Walk
         </h1>
@@ -488,7 +553,7 @@ function App() {
           <form onSubmit={handleSubmit} className="flex space-x-4">
             <input
               type="text"
-              placeholder="Item"
+              placeholder="Add new item"
               value={newItemName}
               onChange={handleChange}
               className="flex-1 rounded border p-2 focus:border-blue-500 focus:outline-none"
@@ -508,10 +573,10 @@ function App() {
           <ol className="space-y-4">
             {items.map((item, index) => (
               <Item
-                key={item.id} // Change this too
+                key={item.id}
                 index={index}
                 item={item}
-                isEditing={editIndex === index} // This is fine as is - editing is position-based
+                isEditing={editIndex === index}
                 editText={editText}
                 editClue={editClue}
                 onEditChange={handleEditChange}
@@ -521,17 +586,37 @@ function App() {
                 onCancelEdit={handleCancelEdit}
                 onMapClick={handleMapItemSelect}
                 isSelectedForMapping={selectedForMapping === index}
-                isSelected={selectedId === item.id} // Update this
+                isSelected={selectedId === item.id}
                 onDragStart={handleDragStart}
                 onDrop={handleListDrop}
                 onDragEnd={handleDragEnd}
                 handleImageUpload={handleImageUpload}
-                onItemClick={() => handleSelect(item.id)} // Update this
+                onItemClick={() => handleSelect(item.id)}
               />
             ))}
           </ol>
         </div>
       </div>
+
+      {/* Mobile Drawer */}
+      <MobileDrawer
+        items={items}
+        selectedId={selectedId}
+        newItemName={newItemName}
+        onNewItemNameChange={handleChange}
+        onNewItemSubmit={handleSubmit}
+        onEditChange={handleEditChange}
+        onEditSubmit={handleEditSubmit}
+        onEditClick={handleEditClick}
+        onDelete={handleDelete}
+        onCancelEdit={handleCancelEdit}
+        onMapClick={handleMapItemSelect}
+        selectedForMapping={selectedForMapping}
+        handleImageUpload={handleImageUpload}
+        editIndex={editIndex}
+        editText={editText}
+        editClue={editClue}
+      />
     </div>
   );
 }
