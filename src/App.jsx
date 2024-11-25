@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FaPencilAlt, FaTrash, FaMapMarkerAlt, FaBars } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import {
@@ -60,6 +60,7 @@ const Item = ({
   item,
   index,
   isEditing,
+  isSelected,
   editText,
   editClue,
   onEditChange,
@@ -72,13 +73,15 @@ const Item = ({
   onDragStart,
   onDrop,
   onDragEnd,
+  onItemClick,
   handleImageUpload,
 }) => {
   return (
     <li
-      className={`mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 ${
-        isSelectedForMapping ? "ring-2 ring-blue-500 bg-blue-50" : ""
-      } hover:shadow-lg`}
+      className={`mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 
+      ${isSelectedForMapping ? "ring-2 ring-blue-500 bg-blue-50" : ""} 
+      ${isSelected ? "ring-2 ring-blue-500 shadow-lg" : ""}
+      hover:shadow-lg`}
       draggable="true"
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", index.toString());
@@ -179,7 +182,10 @@ const Item = ({
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
             {index + 1}
           </div>
-          <div className="flex-grow">
+          <div
+            className="flex-grow cursor-pointer"
+            onClick={() => onItemClick(index)}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FaBars className="cursor-move text-gray-400" />
@@ -188,7 +194,10 @@ const Item = ({
               <div className="flex items-center space-x-2">
                 <div className="relative group">
                   <FaMapMarkerAlt
-                    onClick={() => onMapClick(index)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMapClick(index);
+                    }}
                     className={`cursor-pointer transition-colors duration-200 ${
                       isSelectedForMapping
                         ? "text-blue-500"
@@ -205,11 +214,17 @@ const Item = ({
                   )}
                 </div>
                 <FaPencilAlt
-                  onClick={onEditClick}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditClick();
+                  }}
                   className="cursor-pointer text-gray-400 hover:text-blue-500 transition-colors duration-200"
                 />
                 <FaTrash
-                  onClick={onDelete}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
                   className="cursor-pointer text-gray-400 hover:text-red-500 transition-colors duration-200"
                 />
               </div>
@@ -230,13 +245,15 @@ const Item = ({
 
 function App() {
   const [items, setItems] = useState([]);
-  const [newItem, setNewItem] = useState("");
+  const [newItemName, setNewItemName] = useState("");
   const [editIndex, setEditIndex] = useState(null);
   const [editText, setEditText] = useState("");
   const [editClue, setEditClue] = useState("");
   const [mapCenter] = useState([51.505, -0.09]);
   const [zoom] = useState(13);
   const [selectedForMapping, setSelectedForMapping] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const itemsContainerRef = useRef(null);
 
   const [tempUrls, setTempUrls] = useState(new Set()); // Track URLs to revoke
 
@@ -265,7 +282,7 @@ function App() {
   };
 
   const handleChange = (e) => {
-    setNewItem(e.target.value);
+    setNewItemName(e.target.value);
   };
 
   const handleEditChange = (e) => {
@@ -279,9 +296,16 @@ function App() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (newItem.trim() === "") return;
-    setItems([...items, { text: newItem, clue: "", location: null }]);
-    setNewItem("");
+    if (newItemName.trim() === "") return;
+    const newItem = {
+      id: crypto.randomUUID(),
+      text: newItemName,
+      clue: "",
+      location: null,
+    };
+    setItems([...items, newItem]);
+    setSelectedId(newItem.id);
+    setNewItemName("");
   };
 
   const handleEditSubmit = (e) => {
@@ -299,29 +323,52 @@ function App() {
     setEditIndex(null);
     setEditText("");
     setEditClue("");
+    // Selection remains unchanged after edit
   };
 
   const handleEditClick = (index) => {
     if (index < 0 || index >= items.length) return;
+    const item = items[index];
     setEditIndex(index);
-    setEditText(items[index].text);
-    setEditClue(items[index].clue || "");
+    setEditText(item.text);
+    setEditClue(item.clue || "");
+    setSelectedId(item.id);
   };
 
   const handleCancelEdit = () => {
     setEditIndex(null);
     setEditText("");
     setEditClue("");
+    // Selection remains unchanged after cancel
   };
 
   const handleDelete = (index) => {
     if (index < 0 || index >= items.length) return;
+    const deletedId = items[index].id;
     const updatedItems = items.filter((_, i) => i !== index);
     setItems(updatedItems);
+    if (selectedId === deletedId) {
+      setSelectedId(null);
+    }
+  };
+
+  const handleSelect = (id) => {
+    setSelectedId(id);
+
+    // Find the index of the item to scroll to
+    const index = items.findIndex((item) => item.id === id);
+    if (index !== -1 && itemsContainerRef.current) {
+      const itemElement = itemsContainerRef.current.children[index];
+      if (itemElement) {
+        itemElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
   };
 
   const handleMapItemSelect = (index) => {
     if (index < 0 || index >= items.length) return;
+    const item = items[index];
+    setSelectedId(item.id);
     setSelectedForMapping(selectedForMapping === index ? null : index);
   };
 
@@ -336,11 +383,13 @@ function App() {
     const updatedItems = [...items];
     if (!updatedItems[selectedForMapping]) return;
 
+    const item = updatedItems[selectedForMapping];
     updatedItems[selectedForMapping] = {
-      ...updatedItems[selectedForMapping],
+      ...item,
       location: e.latlng,
     };
     setItems(updatedItems);
+    setSelectedId(item.id);
     setSelectedForMapping(null);
   };
 
@@ -350,22 +399,26 @@ function App() {
     const updatedItems = [...items];
     if (!updatedItems[index]) return;
 
+    const item = updatedItems[index];
     updatedItems[index] = {
-      ...updatedItems[index],
+      ...item,
       location: latlng,
     };
     setItems(updatedItems);
+    setSelectedId(item.id);
   };
 
   const handleDragStart = (e, index) => {
+    const item = items[index];
+    e.dataTransfer.setData("text/plain", index.toString());
     document.body.classList.add("dragging-item");
+    setSelectedId(item.id);
   };
 
   const handleDragEnd = () => {
     document.body.classList.remove("dragging-item");
   };
 
-  // This is the key fix - simplify the list drop logic
   const handleListDrop = (sourceIndex, targetIndex) => {
     if (
       sourceIndex === targetIndex ||
@@ -380,53 +433,18 @@ function App() {
     const [movedItem] = newItems.splice(sourceIndex, 1);
     newItems.splice(targetIndex, 0, movedItem);
     setItems(newItems);
+    setSelectedId(movedItem.id);
   };
 
-  const createCustomIcon = (index) => {
+  const createCustomIcon = (id, isSelected) => {
     return divIcon({
-      className: `custom-marker marker-${index}`,
-      html: `<div class="marker-index">${index + 1}</div>`,
+      className: `custom-marker marker-${id}`,
+      html: `<div class="marker-index ${isSelected ? "selected" : ""}">${
+        items.findIndex((item) => item.id === id) + 1
+      }</div>`,
       iconSize: [24, 24],
       iconAnchor: [12, 24],
     });
-  };
-
-  const CustomPopup = ({ index, item }) => {
-    return (
-      <div className="popup-content min-w-[200px] max-w-[300px]">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white text-sm">
-            {index + 1}
-          </div>
-          <strong className="text-gray-900">{item.text}</strong>
-        </div>
-        {item.clue && (
-          <div className="prose prose-sm max-w-none border-t pt-2">
-            <ReactMarkdown
-              components={{
-                img: ({ node, ...props }) => (
-                  <img
-                    {...props}
-                    className="max-w-full h-auto rounded-lg shadow-sm my-2"
-                    alt={props.alt || "Location image"}
-                  />
-                ),
-                p: ({ node, ...props }) => <p {...props} className="my-2" />,
-              }}
-              urlTransform={(url) => {
-                // Handle blob URLs correctly
-                if (url.startsWith("blob:")) {
-                  return url;
-                }
-                return url;
-              }}
-            >
-              {item.clue}
-            </ReactMarkdown>
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -448,17 +466,15 @@ function App() {
           />
           {items.map(
             (item, index) =>
-              item &&
-              item.location && (
+              item?.location && (
                 <Marker
-                  key={`${index}-${item.text}-marker`}
+                  key={item.id}
                   position={[item.location.lat, item.location.lng]}
-                  icon={createCustomIcon(index)}
-                >
-                  <Popup>
-                    <CustomPopup index={index} item={item} />
-                  </Popup>
-                </Marker>
+                  icon={createCustomIcon(item.id, selectedId === item.id)}
+                  eventHandlers={{
+                    click: () => handleSelect(item.id),
+                  }}
+                />
               )
           )}
         </MapContainer>
@@ -473,7 +489,7 @@ function App() {
             <input
               type="text"
               placeholder="Item"
-              value={newItem}
+              value={newItemName}
               onChange={handleChange}
               className="flex-1 rounded border p-2 focus:border-blue-500 focus:outline-none"
             />
@@ -485,14 +501,17 @@ function App() {
             </button>
           </form>
         </div>
-        <div className="h-[calc(100vh-20rem)] overflow-y-auto">
+        <div
+          className="h-[calc(100vh-20rem)] overflow-y-auto"
+          ref={itemsContainerRef}
+        >
           <ol className="space-y-4">
             {items.map((item, index) => (
               <Item
-                key={`${index}-${item.text}`}
+                key={item.id} // Change this too
                 index={index}
                 item={item}
-                isEditing={editIndex === index}
+                isEditing={editIndex === index} // This is fine as is - editing is position-based
                 editText={editText}
                 editClue={editClue}
                 onEditChange={handleEditChange}
@@ -502,10 +521,12 @@ function App() {
                 onCancelEdit={handleCancelEdit}
                 onMapClick={handleMapItemSelect}
                 isSelectedForMapping={selectedForMapping === index}
+                isSelected={selectedId === item.id} // Update this
                 onDragStart={handleDragStart}
                 onDrop={handleListDrop}
                 onDragEnd={handleDragEnd}
                 handleImageUpload={handleImageUpload}
+                onItemClick={() => handleSelect(item.id)} // Update this
               />
             ))}
           </ol>
