@@ -247,9 +247,9 @@ const handleExport = async () => {
 const importData = async (file) => {
   try {
     const text = await file.text();
-    const fileType = file.name.split('.').pop().toLowerCase();
+    const fileType = file.name.split(".").pop().toLowerCase();
 
-    if (fileType === 'json') {
+    if (fileType === "json") {
       const importBundle = JSON.parse(text);
 
       // Version check
@@ -272,17 +272,19 @@ const importData = async (file) => {
       await db.put(ITEMS_STORE, importBundle.items, "items");
 
       return importBundle.items;
-    } else if (fileType === 'csv') {
-      const rows = text.split('\n').map(row => row.split(','));
+    } else if (fileType === "csv") {
+      const rows = text.split("\n").map((row) => row.split(","));
       const headers = rows[0];
-      const nameIndex = headers.indexOf('name');
-      const clueIndex = headers.indexOf('clue');
+      const nameIndex = headers.indexOf("name");
+      const clueIndex = headers.indexOf("clue");
 
       if (nameIndex === -1 || clueIndex === -1) {
         throw new Error("CSV must contain 'name' and 'clue' columns");
       }
 
-      const items = rows.slice(1).map(row => createItem(row[nameIndex], row[clueIndex]));
+      const items = rows
+        .slice(1)
+        .map((row) => createItem(row[nameIndex], row[clueIndex]));
 
       // Clear existing data
       const db = await initDB();
@@ -538,24 +540,36 @@ const MapEventHandler = ({ onMapClick, onMapDrop }) => {
       });
   }, [map]);
 
-  // Get the container element
-  const container = map.getContainer();
+  useEffect(() => {
+    // Get the container element
+    const container = map.getContainer();
 
-  // Add event listeners to the container
-  container.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  });
+    // Define event handlers
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
 
-  container.addEventListener("drop", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const index = e.dataTransfer.getData("text/plain");
-    if (index) {
-      const point = map.mouseEventToLatLng(e);
-      onMapDrop(parseInt(index), point);
-    }
-  });
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const index = e.dataTransfer.getData("text/plain");
+      if (index) {
+        const point = map.mouseEventToLatLng(e);
+        onMapDrop(parseInt(index), point);
+      }
+    };
+
+    // Add event listeners
+    container.addEventListener("dragover", handleDragOver);
+    container.addEventListener("drop", handleDrop);
+
+    // Cleanup listeners on unmount or when dependencies change
+    return () => {
+      container.removeEventListener("dragover", handleDragOver);
+      container.removeEventListener("drop", handleDrop);
+    };
+  }, [map, onMapDrop]);
 
   // Handle regular map clicks
   useMapEvents({
