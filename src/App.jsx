@@ -49,23 +49,24 @@ const MobileDrawer = ({
     },
     preventScrollOnSwipe: true,
     trackMouse: false,
+    swipeDuration: 500,
     delta: 10,
   });
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white shadow-lg md:hidden">
-      <div className="border-b p-4">
+      <div className="px-4 py-3 border-b">
         <form onSubmit={onNewItemSubmit} className="flex gap-2">
           <input
             type="text"
             value={newItemName}
             onChange={onNewItemNameChange}
             placeholder="Add new item"
-            className="flex-1 rounded border p-2 focus:border-blue-500 focus:outline-none"
+            className="flex-1 rounded border px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
           <button
             type="submit"
-            className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+            className="rounded bg-blue-500 px-5 py-2 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200"
           >
             Add
           </button>
@@ -74,15 +75,27 @@ const MobileDrawer = ({
 
       {selectedItem && (
         <>
-          <div className="flex justify-between items-center px-4 py-2 text-sm text-gray-500">
-            <div>{selectedIndex > 0 ? "← Previous" : ""}</div>
-            <div className="text-gray-400">
-              {selectedIndex + 1} of {items.length}
+          {/* Subtle swipe indicators */}
+          <div className="flex items-center justify-between px-4 py-2 text-sm font-medium">
+            {selectedIndex > 0 ? (
+              <div className="text-blue-500">←</div>
+            ) : (
+              <div className="w-4" />
+            )}
+            <div className="text-xs font-medium text-gray-500">
+              {selectedIndex + 1} / {items.length}
             </div>
-            <div>{selectedIndex < items.length - 1 ? "Next →" : ""}</div>
+            {selectedIndex < items.length - 1 ? (
+              <div className="text-blue-500">→</div>
+            ) : (
+              <div className="w-4" />
+            )}
           </div>
 
-          <div {...handlers} className="max-h-[50vh] overflow-y-auto">
+          <div
+            {...handlers}
+            className="max-h-[calc(60vh-4rem)] overflow-y-auto px-4 pb-4"
+          >
             <Item
               item={selectedItem}
               index={selectedIndex}
@@ -171,10 +184,10 @@ const Item = ({
 }) => {
   return (
     <li
-      className={`mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 
-      ${isSelectedForMapping ? "ring-2 ring-blue-500 bg-blue-50" : ""} 
-      ${isSelected ? "ring-2 ring-blue-500 shadow-lg" : ""}
-      hover:shadow-lg`}
+      className={`list-none mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 
+    ${isSelectedForMapping ? "ring-2 ring-blue-500 bg-blue-50" : ""} 
+    ${isSelected ? "md:ring-2 md:ring-blue-500 md:shadow-lg" : ""}
+    hover:shadow-lg`}
       draggable="true"
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", index.toString());
