@@ -90,6 +90,19 @@ li[draggable="true"]:active {
   }
 }
 
+.drawer-handle {
+  width: 32px;
+  height: 4px;
+  background-color: #e5e7eb;
+  border-radius: 2px;
+  margin: 8px auto;
+  transition: transform 0.2s ease-in-out;
+}
+
+.drawer-handle.collapsed {
+  transform: rotate(180deg);
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
