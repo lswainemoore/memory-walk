@@ -14,6 +14,8 @@ import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
+import PositionSelector from "./PositionSelector";
+
 const MobileDrawer = ({
   items,
   selectedId,
@@ -32,6 +34,7 @@ const MobileDrawer = ({
   editText,
   editClue,
   onSelect,
+  onListDrop,
 }) => {
   const selectedIndex = items.findIndex((item) => item.id === selectedId);
   const selectedItem = items.find((item) => item.id === selectedId);
@@ -123,6 +126,8 @@ const MobileDrawer = ({
               isSelectedForMapping={selectedForMapping === selectedIndex}
               isSelected={true}
               handleImageUpload={handleImageUpload}
+              totalItems={items.length}
+              onListDrop={onListDrop}
             />
           </div>
         </>
@@ -193,6 +198,8 @@ const Item = ({
   onDragEnd,
   onItemClick,
   handleImageUpload,
+  totalItems,
+  onListDrop,
 }) => {
   return (
     <li
@@ -224,9 +231,6 @@ const Item = ({
             placeholder="Item title"
           />
           <div className="space-y-2">
-            <div className="text-sm text-gray-600">
-              Clue supports Markdown and images
-            </div>
             <textarea
               name="editClue"
               value={editClue}
@@ -245,7 +249,7 @@ const Item = ({
                 }
               }}
               className="h-32 w-full rounded border p-2 font-mono text-sm"
-              placeholder="Add details with Markdown... (Paste images directly)"
+              placeholder="Add details with Markdown..."
             />
             <div className="flex space-x-2">
               <label className="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">
@@ -297,9 +301,17 @@ const Item = ({
         </form>
       ) : (
         <div className="flex items-start gap-4">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
-            {index + 1}
-          </div>
+          {window.innerWidth < 768 ? (
+            <PositionSelector
+              currentPosition={index}
+              totalItems={totalItems}
+              onReorder={(from, to) => onListDrop(from, to)} // Use onListDrop here
+            />
+          ) : (
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
+              {index + 1}
+            </div>
+          )}
           <div
             className="flex-grow cursor-pointer"
             onClick={() => onItemClick(index)}
@@ -472,6 +484,7 @@ function App() {
 
   const handleSelect = (id) => {
     setSelectedId(id);
+    setEditIndex(null);
 
     // Find the index of the item to scroll to
     const index = items.findIndex((item) => item.id === id);
@@ -567,6 +580,7 @@ function App() {
 
   const onSelect = (id) => {
     setSelectedId(id);
+    setEditIndex(null);
   };
 
   return (
@@ -649,13 +663,13 @@ function App() {
                 onDragEnd={handleDragEnd}
                 handleImageUpload={handleImageUpload}
                 onItemClick={() => handleSelect(item.id)}
+                totalItems={items.length}
               />
             ))}
           </ol>
         </div>
       </div>
 
-      {/* Mobile Drawer */}
       <MobileDrawer
         items={items}
         selectedId={selectedId}
@@ -674,6 +688,7 @@ function App() {
         editText={editText}
         editClue={editClue}
         onSelect={onSelect}
+        onListDrop={handleListDrop}
       />
     </div>
   );
