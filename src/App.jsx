@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { FaPencilAlt, FaTrash, FaMapMarkerAlt, FaBars } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import {
@@ -15,6 +15,105 @@ import "leaflet/dist/leaflet.css";
 import "./App.css";
 
 import PositionSelector from "./PositionSelector";
+
+import { openDB } from "idb";
+
+// Add these constants and functions before the App component:
+const DB_NAME = "memoryWalkDB";
+const DB_VERSION = 1;
+const ITEMS_STORE = "items";
+const IMAGES_STORE = "images";
+
+const initDB = async () => {
+  const db = await openDB(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      // Create stores if they don't exist
+      if (!db.objectStoreNames.contains(ITEMS_STORE)) {
+        db.createObjectStore(ITEMS_STORE);
+      }
+      if (!db.objectStoreNames.contains(IMAGES_STORE)) {
+        db.createObjectStore(IMAGES_STORE);
+      }
+    },
+  });
+  return db;
+};
+
+const clearAllData = async () => {
+  const db = await initDB();
+
+  // Clear all stores
+  await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
+};
+
+const saveToIndexedDB = async (items) => {
+  const db = await initDB();
+  await db.put(ITEMS_STORE, items, "items");
+};
+
+const loadFromIndexedDB = async () => {
+  try {
+    const db = await initDB();
+    const items = await db.get(ITEMS_STORE, "items");
+    return items || [];
+  } catch (error) {
+    console.error("Error loading from IndexedDB:", error);
+    return [];
+  }
+};
+
+const saveImageToIndexedDB = async (imageId, imageBlob) => {
+  const db = await initDB();
+  await db.put(IMAGES_STORE, imageBlob, imageId);
+  return imageId;
+};
+
+const loadImageFromIndexedDB = async (imageId) => {
+  const db = await initDB();
+  const imageBlob = await db.get(IMAGES_STORE, imageId);
+  if (imageBlob) {
+    return URL.createObjectURL(imageBlob);
+  }
+  return null;
+};
+
+const processStoredImages = async (markdown) => {
+  if (!markdown) return markdown;
+
+  const regex = /!\[([^\]]*)\]\(stored:([^)]+)\)/g;
+  let match;
+  let processedMarkdown = markdown;
+
+  while ((match = regex.exec(markdown)) !== null) {
+    const [fullMatch, altText, imageId] = match;
+    const imageUrl = await loadImageFromIndexedDB(imageId);
+    if (imageUrl) {
+      processedMarkdown = processedMarkdown.replace(
+        fullMatch,
+        `![${altText}](${imageUrl})`
+      );
+    }
+  }
+
+  return processedMarkdown;
+};
+
+const ResetButton = ({ onReset, items }) => {
+  return (
+    <>
+      {items?.length > 0 && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={onReset}
+            className="px-4 py-2 text-sm text-red-600 hover:text-red-800 border border-red-600 hover:border-red-800 rounded transition-colors duration-200"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+    </>
+  );
+};
 
 const MobileDrawer = ({
   items,
@@ -35,6 +134,7 @@ const MobileDrawer = ({
   editClue,
   onSelect,
   onListDrop,
+  resetButton,
 }) => {
   const selectedIndex = items.findIndex((item) => item.id === selectedId);
   const selectedItem = items.find((item) => item.id === selectedId);
@@ -62,6 +162,7 @@ const MobileDrawer = ({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white shadow-lg md:hidden">
       <div className="px-4 py-3 border-b">
+        {resetButton}
         <form onSubmit={onNewItemSubmit} className="flex gap-2">
           <input
             type="text"
@@ -203,6 +304,19 @@ const Item = ({
   totalItems,
   onListDrop,
 }) => {
+  const [processedClue, setProcessedClue] = useState(item.clue);
+  useEffect(() => {
+    const processClue = async () => {
+      if (item.clue) {
+        const processed = await processStoredImages(item.clue);
+        setProcessedClue(processed);
+      } else {
+        setProcessedClue("");
+      }
+    };
+    processClue();
+  }, [item.clue]);
+
   return (
     <li
       className={`list-none mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 
@@ -363,8 +477,15 @@ const Item = ({
             </div>
             {item.clue && (
               <div className="mt-3 prose prose-sm max-w-none border-t pt-3">
-                <ReactMarkdown urlTransform={(value) => value}>
-                  {item.clue}
+                <ReactMarkdown
+                  urlTransform={(value) => {
+                    // If it's a stored image URL, leave it as is
+                    if (value.startsWith("stored:")) return value;
+                    // Otherwise, use the original urlTransform behavior
+                    return value;
+                  }}
+                >
+                  {processedClue}
                 </ReactMarkdown>
               </div>
             )}
@@ -377,6 +498,7 @@ const Item = ({
 
 function App() {
   const [items, setItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newItemName, setNewItemName] = useState("");
   const [editIndex, setEditIndex] = useState(null);
   const [editText, setEditText] = useState("");
@@ -396,12 +518,36 @@ function App() {
     };
   }, [tempUrls]);
 
+  useEffect(() => {
+    const loadItems = async () => {
+      const loadedItems = await loadFromIndexedDB();
+      setItems(loadedItems);
+      setIsLoading(false);
+    };
+    loadItems();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      saveToIndexedDB(items);
+    }
+  }, [items, isLoading]);
+
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
+      // Generate a unique ID for the image
+      const imageId = `image-${crypto.randomUUID()}`;
+
+      // Save the image to IndexedDB
+      await saveImageToIndexedDB(imageId, file);
+
+      // Create a temporary URL for immediate display
       const tempUrl = URL.createObjectURL(file);
       setTempUrls((prev) => new Set(prev).add(tempUrl));
 
-      const imageMarkdown = `\n![${file.name}](${tempUrl})\n`;
+      // Add a special marker in the markdown to identify our stored images
+      const imageMarkdown = `\n![${file.name}](stored:${imageId})\n`;
+
       onEditChange({
         target: {
           name: "editClue",
@@ -585,6 +731,38 @@ function App() {
     setEditIndex(null);
   };
 
+  const handleReset = async () => {
+    if (
+      window.confirm(
+        "Are you sure you want to clear all data? This cannot be undone!"
+      )
+    ) {
+      try {
+        // Clear IndexedDB
+        await clearAllData();
+
+        // Reset all state
+        setItems([]);
+        setSelectedId(null);
+        setEditIndex(null);
+        setEditText("");
+        setEditClue("");
+        setSelectedForMapping(null);
+
+        // Clear any temporary URLs
+        tempUrls.forEach((url) => URL.revokeObjectURL(url));
+        setTempUrls(new Set());
+
+        alert("All data has been cleared successfully.");
+      } catch (error) {
+        console.error("Error clearing data:", error);
+        alert("There was an error clearing the data. Please try again.");
+      }
+    }
+  };
+
+  const resetButton = <ResetButton onReset={handleReset} items={items} />;
+
   return (
     <div className="flex h-screen w-screen">
       <div className="flex-grow h-full md:w-2/3">
@@ -619,6 +797,7 @@ function App() {
 
       {/* Desktop Sidebar */}
       <div className="hidden md:block md:w-1/3 bg-white p-6 shadow-xl overflow-auto">
+        {resetButton}
         <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
           Memory Walk
         </h1>
@@ -691,6 +870,7 @@ function App() {
         editClue={editClue}
         onSelect={onSelect}
         onListDrop={handleListDrop}
+        resetButton={resetButton}
       />
     </div>
   );
