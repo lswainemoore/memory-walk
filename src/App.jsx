@@ -102,16 +102,25 @@ const ResetButton = ({ onReset, items }) => {
   return (
     <>
       {items?.length > 0 && (
-        <div className="mb-4 flex justify-end">
-          <button
-            onClick={onReset}
-            className="px-4 py-2 text-sm text-red-600 hover:text-red-800 border border-red-600 hover:border-red-800 rounded transition-colors duration-200"
-          >
-            Reset
-          </button>
-        </div>
+        <button
+          onClick={onReset}
+          className="px-4 py-2 text-sm text-red-600 hover:text-red-800 border border-red-600 hover:border-red-800 rounded transition-colors duration-200"
+        >
+          Reset
+        </button>
       )}
     </>
+  );
+};
+
+const MobileToolbar = ({ resetButton }) => {
+  return (
+    <div className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b md:hidden">
+      <div className="px-4 py-3 flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-800">Memory Walk</h1>
+        {resetButton}
+      </div>
+    </div>
   );
 };
 
@@ -162,7 +171,6 @@ const MobileDrawer = ({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white shadow-lg md:hidden">
       <div className="px-4 py-3 border-b">
-        {resetButton}
         <form onSubmit={onNewItemSubmit} className="flex gap-2">
           <input
             type="text"
@@ -797,10 +805,10 @@ function App() {
 
       {/* Desktop Sidebar */}
       <div className="hidden md:block md:w-1/3 bg-white p-6 shadow-xl overflow-auto">
-        {resetButton}
-        <h1 className="mb-8 text-center text-4xl font-bold text-gray-800">
-          Memory Walk
-        </h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-4xl font-bold text-gray-800">Memory Walk</h1>
+          {resetButton}
+        </div>
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <form onSubmit={handleSubmit} className="flex space-x-4">
             <input
@@ -851,6 +859,7 @@ function App() {
         </div>
       </div>
 
+      <MobileToolbar resetButton={resetButton} />
       <MobileDrawer
         items={items}
         selectedId={selectedId}

@@ -51,6 +51,14 @@ li[draggable="true"]:active {
   cursor: grabbing;
 }
 
+@media (max-width: 768px) {
+  /* Adjust the main map container */
+  .leaflet-container {
+    height: calc(100% - 56px) !important;
+    margin-top: 56px;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
