@@ -119,6 +119,204 @@ const processStoredImages = async (markdown) => {
   return processedMarkdown;
 };
 
+const findImagesInItems = (items) => {
+  const imageMap = new Map();
+  const regex = /!\[([^\]]*)\]\(stored:([^)]+)\)/g;
+
+  items.forEach((item, index) => {
+    if (item.clue) {
+      let match;
+      while ((match = regex.exec(item.clue)) !== null) {
+        const [fullMatch, altText, imageId] = match;
+        imageMap.set(imageId, {
+          itemIndex: index,
+          itemText: item.text,
+          altText,
+        });
+      }
+    }
+  });
+
+  return imageMap;
+};
+
+// Now modify the exportData function
+const exportData = async () => {
+  try {
+    // Get all data from IndexedDB
+    const db = await initDB();
+    const items = (await db.get(ITEMS_STORE, "items")) || [];
+
+    // Debug: Log some items info
+    console.log(`Total items: ${items.length}`);
+    console.log("Items with clues:", items.filter((item) => item.clue).length);
+
+    // Get image mapping
+    const imageMap = findImagesInItems(items);
+    console.log(
+      "Found images:",
+      Array.from(imageMap.entries()).map(([id, info]) => ({
+        id,
+        itemText: info.itemText,
+        altText: info.altText,
+      }))
+    );
+
+    // Create export bundle with images
+    const images = {};
+    for (const [imageId, info] of imageMap.entries()) {
+      const imageBlob = await db.get(IMAGES_STORE, imageId);
+      if (imageBlob) {
+        const properBlob = new Blob([imageBlob], {
+          type: imageBlob.type || "image/jpeg",
+        });
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(properBlob);
+        });
+        images[imageId] = base64;
+        console.log(`Processed image ${imageId} from item "${info.itemText}"`);
+      } else {
+        console.warn(
+          `Image ${imageId} referenced in item "${info.itemText}" not found in storage`
+        );
+      }
+    }
+
+    const exportBundle = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      items,
+      images,
+    };
+
+    // Debug: Log export info
+    console.log("Export bundle:", {
+      itemCount: items.length,
+      imageCount: Object.keys(images).length,
+      itemsWithClues: items.filter((item) => item.clue).length,
+      totalBundleSize: JSON.stringify(exportBundle).length,
+    });
+
+    // Create and download file
+    const blob = new Blob([JSON.stringify(exportBundle)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `memory-walk-export-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    return {
+      success: true,
+      imageCount: Object.keys(images).length,
+      itemCount: items.length,
+      itemsWithClues: items.filter((item) => item.clue).length,
+    };
+  } catch (error) {
+    console.error("Export failed:", error);
+    throw error;
+  }
+};
+
+const handleExport = async () => {
+  try {
+    const result = await exportData();
+    alert(
+      `Export successful!\nExported ${result.itemCount} items and ${result.imageCount} images.`
+    );
+  } catch (error) {
+    alert("Export failed: " + error.message);
+  }
+};
+
+const importData = async (file) => {
+  try {
+    const text = await file.text();
+    const importBundle = JSON.parse(text);
+
+    // Version check
+    if (!importBundle.version || importBundle.version !== 1) {
+      throw new Error("Unsupported export version");
+    }
+
+    // Clear existing data
+    const db = await initDB();
+    await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
+
+    // Import images first
+    for (const [imageId, base64] of Object.entries(importBundle.images)) {
+      const response = await fetch(base64);
+      const blob = await response.blob();
+      await db.put(IMAGES_STORE, blob, imageId);
+    }
+
+    // Import items
+    await db.put(ITEMS_STORE, importBundle.items, "items");
+
+    return importBundle.items;
+  } catch (error) {
+    console.error("Import failed:", error);
+    throw error;
+  }
+};
+
+const ImportExportButtons = ({ onImport }) => {
+  const fileInputRef = useRef();
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportClick = async () => {
+    setIsExporting(true);
+    try {
+      await handleExport();
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-2">
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="application/json"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            try {
+              await onImport(file);
+              alert("Import successful!");
+            } catch (error) {
+              alert("Import failed: " + error.message);
+            }
+            e.target.value = "";
+          }
+        }}
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-600 hover:border-blue-800 rounded transition-colors duration-200"
+      >
+        Import
+      </button>
+      <button
+        onClick={handleExportClick}
+        disabled={isExporting}
+        className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-600 hover:border-blue-800 rounded transition-colors duration-200 disabled:opacity-50"
+      >
+        {isExporting ? "Exporting..." : "Export"}
+      </button>
+    </div>
+  );
+};
+
 const ResetButton = ({ onReset, items }) => {
   return (
     <>
@@ -134,12 +332,17 @@ const ResetButton = ({ onReset, items }) => {
   );
 };
 
-const MobileToolbar = ({ resetButton }) => {
+const MobileToolbar = ({ resetButton, handleImport }) => {
   return (
     <div className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b md:hidden">
-      <div className="px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-800">Memory Walk</h1>
-        {resetButton}
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-800">Memory Walk</h1>
+          <div className="flex items-center gap-2">
+            <ImportExportButtons onImport={handleImport} />
+            {resetButton}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -785,6 +988,21 @@ function App() {
     setSelectedId(movedItem.id);
   };
 
+  const handleImport = async (file) => {
+    if (window.confirm("Importing will replace all current data. Continue?")) {
+      try {
+        const importedItems = await importData(file);
+        setItems(importedItems);
+        if (importedItems.length > 0) {
+          setSelectedId(importedItems[0].id);
+        }
+      } catch (error) {
+        console.error("Import failed:", error);
+        throw error;
+      }
+    }
+  };
+
   const createCustomIcon = (id, isSelected) => {
     return divIcon({
       className: `custom-marker marker-${id}`,
@@ -871,6 +1089,9 @@ function App() {
           <h1 className="text-4xl font-bold text-gray-800">Memory Walk</h1>
           {resetButton}
         </div>
+        <div className="mb-4 flex justify-end">
+          <ImportExportButtons onImport={handleImport} />
+        </div>
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <form onSubmit={handleSubmit} className="flex space-x-4">
             <input
@@ -921,7 +1142,7 @@ function App() {
         </div>
       </div>
 
-      <MobileToolbar resetButton={resetButton} />
+      <MobileToolbar resetButton={resetButton} handleImport={handleImport} />
       <MobileDrawer
         items={items}
         selectedId={selectedId}
