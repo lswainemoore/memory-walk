@@ -56,15 +56,15 @@ const clearAllData = async () => {
 const saveToIndexedDB = async (items) => {
   try {
     const db = await initDB();
-    console.log(
-      "Saving items:",
-      items.map((i) => ({
-        id: i.id,
-        text: i.text,
-        hasClue: !!i.clue,
-        clueLength: i.clue?.length,
-      }))
-    );
+    // console.log(
+    //   "Saving items:",
+    //   items.map((i) => ({
+    //     id: i.id,
+    //     text: i.text,
+    //     hasClue: !!i.clue,
+    //     clueLength: i.clue?.length,
+    //   }))
+    // );
     await db.put(ITEMS_STORE, items, "items");
   } catch (error) {
     console.error("Error saving to IndexedDB:", error);
@@ -247,33 +247,66 @@ const handleExport = async () => {
 const importData = async (file) => {
   try {
     const text = await file.text();
-    const importBundle = JSON.parse(text);
+    const fileType = file.name.split('.').pop().toLowerCase();
 
-    // Version check
-    if (!importBundle.version || importBundle.version !== 1) {
-      throw new Error("Unsupported export version");
+    if (fileType === 'json') {
+      const importBundle = JSON.parse(text);
+
+      // Version check
+      if (!importBundle.version || importBundle.version !== 1) {
+        throw new Error("Unsupported export version");
+      }
+
+      // Clear existing data
+      const db = await initDB();
+      await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
+
+      // Import images first
+      for (const [imageId, base64] of Object.entries(importBundle.images)) {
+        const response = await fetch(base64);
+        const blob = await response.blob();
+        await db.put(IMAGES_STORE, blob, imageId);
+      }
+
+      // Import items
+      await db.put(ITEMS_STORE, importBundle.items, "items");
+
+      return importBundle.items;
+    } else if (fileType === 'csv') {
+      const rows = text.split('\n').map(row => row.split(','));
+      const headers = rows[0];
+      const nameIndex = headers.indexOf('name');
+      const clueIndex = headers.indexOf('clue');
+
+      if (nameIndex === -1 || clueIndex === -1) {
+        throw new Error("CSV must contain 'name' and 'clue' columns");
+      }
+
+      const items = rows.slice(1).map(row => createItem(row[nameIndex], row[clueIndex]));
+
+      // Clear existing data
+      const db = await initDB();
+      await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
+
+      // Import items
+      await db.put(ITEMS_STORE, items, "items");
+
+      return items;
+    } else {
+      throw new Error("Unsupported file type");
     }
-
-    // Clear existing data
-    const db = await initDB();
-    await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
-
-    // Import images first
-    for (const [imageId, base64] of Object.entries(importBundle.images)) {
-      const response = await fetch(base64);
-      const blob = await response.blob();
-      await db.put(IMAGES_STORE, blob, imageId);
-    }
-
-    // Import items
-    await db.put(ITEMS_STORE, importBundle.items, "items");
-
-    return importBundle.items;
   } catch (error) {
     console.error("Import failed:", error);
     throw error;
   }
 };
+
+const createItem = (text, clue = "", location = null) => ({
+  id: crypto.randomUUID(),
+  text,
+  clue,
+  location,
+});
 
 const ControlButtons = ({ onImport, onReset, items }) => {
   const fileInputRef = useRef();
@@ -294,7 +327,7 @@ const ControlButtons = ({ onImport, onReset, items }) => {
         type="file"
         ref={fileInputRef}
         className="hidden"
-        accept="application/json"
+        accept="application/json,text/csv"
         onChange={async (e) => {
           const file = e.target.files?.[0];
           if (file) {
@@ -798,12 +831,6 @@ function App() {
     }
   }, [items, isLoading]);
 
-  // useEffect(() => {
-  //   if (!selectedId && items.length > 0) {
-  //     setSelectedId(items[0].id);
-  //   }
-  // }, [items, selectedId]);
-
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
       // Generate a unique ID for the image
@@ -846,12 +873,7 @@ function App() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (newItemName.trim() === "") return;
-    const newItem = {
-      id: crypto.randomUUID(),
-      text: newItemName,
-      clue: "",
-      location: null,
-    };
+    const newItem = createItem(newItemName);
     setItems([...items, newItem]);
     setSelectedId(newItem.id);
     setNewItemName("");
@@ -906,6 +928,7 @@ function App() {
     setEditIndex(null);
 
     // Find the index of the item to scroll to
+    // TODO I don't think this is working...
     const index = items.findIndex((item) => item.id === id);
     if (index !== -1 && itemsContainerRef.current) {
       const itemElement = itemsContainerRef.current.children[index];
