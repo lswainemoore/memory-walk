@@ -76,7 +76,9 @@ const Item = ({
 }) => {
   return (
     <li
-      className={`mb-4 rounded-lg bg-white p-4 shadow-md ${isSelectedForMapping ? "ring-2 ring-blue-500" : ""}`}
+      className={`mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 ${
+        isSelectedForMapping ? "ring-2 ring-blue-500 bg-blue-50" : ""
+      } hover:shadow-lg`}
       draggable="true"
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", index.toString());
@@ -121,10 +123,9 @@ const Item = ({
                   }
                 }
               }}
-              className="w-full h-32 rounded border p-2 font-mono text-sm"
+              className="h-32 w-full rounded border p-2 font-mono text-sm"
               placeholder="Add details with Markdown... (Paste images directly)"
             />
-
             <div className="flex space-x-2">
               <label className="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">
                 📁 Add Image
@@ -174,51 +175,52 @@ const Item = ({
           </div>
         </form>
       ) : (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 w-full">
-            <FaBars className="cursor-move text-gray-400 flex-shrink-0" />
-            <div className="w-full">
-              <span className="text-lg">
-                #{index + 1} {item.text}
-              </span>
-              {item.clue && (
-                <div className="mt-2 prose prose-sm max-w-none">
-                  <ReactMarkdown
-                    // components={{
-                    //   img: ({ node, ...props }) => (
-                    //     <img
-                    //       {...props}
-                    //       className="max-w-full h-auto rounded-lg shadow-sm"
-                    //     />
-                    //   ),
-                    // }}
-                    urlTransform={(value) => value}
-                  >
-                    {item.clue}
-                  </ReactMarkdown>
-                </div>
-              )}
-              {item.location && (
-                <span className="block mt-1 text-sm text-blue-500">
-                  [{item.location.lat.toFixed(2)},{" "}
-                  {item.location.lng.toFixed(2)}]
-                </span>
-              )}
-            </div>
+        <div className="flex items-start gap-4">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
+            {index + 1}
           </div>
-          <div className="flex space-x-2 ml-4 flex-shrink-0">
-            <FaMapMarkerAlt
-              onClick={() => onMapClick(index)}
-              className={`cursor-pointer ${isSelectedForMapping ? "text-blue-500" : "text-gray-500 hover:text-blue-500"}`}
-            />
-            <FaPencilAlt
-              onClick={onEditClick}
-              className="cursor-pointer text-gray-500 hover:text-blue-500"
-            />
-            <FaTrash
-              onClick={onDelete}
-              className="cursor-pointer text-gray-500 hover:text-red-500"
-            />
+          <div className="flex-grow">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FaBars className="cursor-move text-gray-400" />
+                <span className="text-lg font-medium">{item.text}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="relative group">
+                  <FaMapMarkerAlt
+                    onClick={() => onMapClick(index)}
+                    className={`cursor-pointer transition-colors duration-200 ${
+                      isSelectedForMapping
+                        ? "text-blue-500"
+                        : "text-gray-400 hover:text-blue-500"
+                    }`}
+                  />
+                  {item.location && (
+                    <div className="absolute -top-8 right-0 hidden group-hover:block">
+                      <div className="rounded bg-gray-800 px-2 py-1 text-xs text-white whitespace-nowrap">
+                        [{item.location.lat.toFixed(4)},{" "}
+                        {item.location.lng.toFixed(4)}]
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <FaPencilAlt
+                  onClick={onEditClick}
+                  className="cursor-pointer text-gray-400 hover:text-blue-500 transition-colors duration-200"
+                />
+                <FaTrash
+                  onClick={onDelete}
+                  className="cursor-pointer text-gray-400 hover:text-red-500 transition-colors duration-200"
+                />
+              </div>
+            </div>
+            {item.clue && (
+              <div className="mt-3 prose prose-sm max-w-none border-t pt-3">
+                <ReactMarkdown urlTransform={(value) => value}>
+                  {item.clue}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         </div>
       )}
