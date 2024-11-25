@@ -13,15 +13,6 @@ import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
-const fileToBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (error) => reject(error);
-  });
-};
-
 const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   const map = useMap();
 
@@ -134,18 +125,7 @@ const Item = ({
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      try {
-                        const base64 = await fileToBase64(file);
-                        const imageMarkdown = `\n![Photo](${base64})\n`;
-                        onEditChange({
-                          target: {
-                            name: "editClue",
-                            value: editClue + imageMarkdown,
-                          },
-                        });
-                      } catch (error) {
-                        console.error("Error processing image:", error);
-                      }
+                      await handleImageUpload(file, editClue, onEditChange);
                     }
                   }}
                 />
@@ -230,7 +210,6 @@ function App() {
   const [mapCenter] = useState([51.505, -0.09]);
   const [zoom] = useState(13);
   const [selectedForMapping, setSelectedForMapping] = useState(null);
-  const [draggedIndex, setDraggedIndex] = useState(null);
 
   const [tempUrls, setTempUrls] = useState(new Set()); // Track URLs to revoke
 
@@ -349,17 +328,14 @@ function App() {
       location: latlng,
     };
     setItems(updatedItems);
-    setDraggedIndex(null);
   };
 
   const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
     document.body.classList.add("dragging-item");
   };
 
   const handleDragEnd = () => {
     document.body.classList.remove("dragging-item");
-    setDraggedIndex(null);
   };
 
   // This is the key fix - simplify the list drop logic
