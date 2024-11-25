@@ -533,7 +533,7 @@ const MapEventHandler = ({ onMapClick, onMapDrop }) => {
     map
       .locate()
       .on("locationfound", (e) => {
-        map.flyTo(e.latlng, map.getZoom());
+        map.setView(e.latlng, map.getZoom());
       })
       .on("locationerror", (e) => {
         console.warn("Location access denied");
