@@ -529,6 +529,8 @@ const MobileDrawer = ({
 const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   const map = useMap();
 
+  // TODO this should really be behind a button. also we should use the points
+  // themselves when we can.
   useEffect(() => {
     map
       .locate()
