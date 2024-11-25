@@ -9,6 +9,7 @@ import {
   useMapEvents,
   useMap,
 } from "react-leaflet";
+import { useSwipeable } from "react-swipeable";
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
@@ -30,9 +31,26 @@ const MobileDrawer = ({
   editIndex,
   editText,
   editClue,
+  onSelect,
 }) => {
-  const selectedItem = items.find((item) => item.id === selectedId);
   const selectedIndex = items.findIndex((item) => item.id === selectedId);
+  const selectedItem = items.find((item) => item.id === selectedId);
+
+  const handlers = useSwipeable({
+    onSwipedLeft: () => {
+      if (selectedIndex < items.length - 1) {
+        onSelect(items[selectedIndex + 1].id);
+      }
+    },
+    onSwipedRight: () => {
+      if (selectedIndex > 0) {
+        onSelect(items[selectedIndex - 1].id);
+      }
+    },
+    preventScrollOnSwipe: true,
+    trackMouse: false,
+    delta: 10,
+  });
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white shadow-lg md:hidden">
@@ -55,24 +73,34 @@ const MobileDrawer = ({
       </div>
 
       {selectedItem && (
-        <div className="max-h-[50vh] overflow-y-auto">
-          <Item
-            item={selectedItem}
-            index={selectedIndex}
-            isEditing={editIndex === selectedIndex}
-            editText={editText}
-            editClue={editClue}
-            onEditChange={onEditChange}
-            onEditSubmit={onEditSubmit}
-            onEditClick={() => onEditClick(selectedIndex)}
-            onDelete={() => onDelete(selectedIndex)}
-            onCancelEdit={onCancelEdit}
-            onMapClick={() => onMapClick(selectedIndex)}
-            isSelectedForMapping={selectedForMapping === selectedIndex}
-            isSelected={true}
-            handleImageUpload={handleImageUpload}
-          />
-        </div>
+        <>
+          <div className="flex justify-between items-center px-4 py-2 text-sm text-gray-500">
+            <div>{selectedIndex > 0 ? "← Previous" : ""}</div>
+            <div className="text-gray-400">
+              {selectedIndex + 1} of {items.length}
+            </div>
+            <div>{selectedIndex < items.length - 1 ? "Next →" : ""}</div>
+          </div>
+
+          <div {...handlers} className="max-h-[50vh] overflow-y-auto">
+            <Item
+              item={selectedItem}
+              index={selectedIndex}
+              isEditing={editIndex === selectedIndex}
+              editText={editText}
+              editClue={editClue}
+              onEditChange={onEditChange}
+              onEditSubmit={onEditSubmit}
+              onEditClick={() => onEditClick(selectedIndex)}
+              onDelete={() => onDelete(selectedIndex)}
+              onCancelEdit={onCancelEdit}
+              onMapClick={() => onMapClick(selectedIndex)}
+              isSelectedForMapping={selectedForMapping === selectedIndex}
+              isSelected={true}
+              handleImageUpload={handleImageUpload}
+            />
+          </div>
+        </>
       )}
     </div>
   );
@@ -512,6 +540,10 @@ function App() {
     });
   };
 
+  const onSelect = (id) => {
+    setSelectedId(id);
+  };
+
   return (
     <div className="flex h-screen w-screen">
       <div className="flex-grow h-full md:w-2/3">
@@ -616,6 +648,7 @@ function App() {
         editIndex={editIndex}
         editText={editText}
         editClue={editClue}
+        onSelect={onSelect}
       />
     </div>
   );
