@@ -51,7 +51,6 @@ const Item = ({
   onMapClick,
   isSelectedForMapping,
   onDragStart,
-  onDragOver,
   onDrop,
   onDragEnd
 }) => {
@@ -66,7 +65,6 @@ const Item = ({
       onDragEnd={onDragEnd}
       onDragOver={(e) => {
         e.preventDefault();
-        onDragOver(index);
       }}
       onDrop={(e) => {
         e.preventDefault();
@@ -174,10 +172,11 @@ function App() {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-    if (editIndex === null) return;
+    if (editIndex === null || editIndex < 0 || editIndex >= items.length) return;
+
     const updatedItems = [...items];
     updatedItems[editIndex] = {
-      ...updatedItems[editIndex],
+      ...items[editIndex],
       text: editText,
       clue: editClue
     };
@@ -188,9 +187,10 @@ function App() {
   };
 
   const handleEditClick = (index) => {
+    if (index < 0 || index >= items.length) return;
     setEditIndex(index);
     setEditText(items[index].text);
-    setEditClue(items[index].clue);
+    setEditClue(items[index].clue || "");
   };
 
   const handleCancelEdit = () => {
@@ -200,18 +200,24 @@ function App() {
   };
 
   const handleDelete = (index) => {
+    if (index < 0 || index >= items.length) return;
     const updatedItems = items.filter((_, i) => i !== index);
     setItems(updatedItems);
   };
 
   const handleMapItemSelect = (index) => {
+    if (index < 0 || index >= items.length) return;
     setSelectedForMapping(selectedForMapping === index ? null : index);
   };
 
   const handleMapClick = (e) => {
-    if (selectedForMapping === null) return;
+    if (selectedForMapping === null || 
+        selectedForMapping < 0 || 
+        selectedForMapping >= items.length) return;
     
     const updatedItems = [...items];
+    if (!updatedItems[selectedForMapping]) return;
+
     updatedItems[selectedForMapping] = {
       ...updatedItems[selectedForMapping],
       location: e.latlng
@@ -221,7 +227,11 @@ function App() {
   };
 
   const handleMapDrop = (index, latlng) => {
+    if (index < 0 || index >= items.length) return;
+    
     const updatedItems = [...items];
+    if (!updatedItems[index]) return;
+
     updatedItems[index] = {
       ...updatedItems[index],
       location: latlng
@@ -234,23 +244,24 @@ function App() {
     setDraggedIndex(index);
     document.body.classList.add('dragging-item');
   };
-
+  
   const handleDragEnd = () => {
     document.body.classList.remove('dragging-item');
-  };
-
-  const handleDragOver = (index) => {
-    if (draggedIndex === null || draggedIndex === index) return;
-  };
-
-  const handleListDrop = (sourceIndex, targetIndex) => {
-    if (sourceIndex === targetIndex) return;
-    
-    const newItems = [...items];
-    const [removed] = newItems.splice(sourceIndex, 1);
-    newItems.splice(targetIndex, 0, removed);
-    setItems(newItems);
     setDraggedIndex(null);
+  };
+  
+  // This is the key fix - simplify the list drop logic
+  const handleListDrop = (sourceIndex, targetIndex) => {
+    if (sourceIndex === targetIndex || 
+        sourceIndex < 0 || 
+        targetIndex < 0 || 
+        sourceIndex >= items.length || 
+        targetIndex >= items.length) return;
+      
+    const newItems = [...items];
+    const [movedItem] = newItems.splice(sourceIndex, 1);
+    newItems.splice(targetIndex, 0, movedItem);
+    setItems(newItems);
   };
 
   const createCustomIcon = (index) => {
@@ -280,7 +291,7 @@ function App() {
             onMapDrop={handleMapDrop}
           />
           {items.map((item, index) => 
-            item.location && (
+            item && item.location && (
               <Marker 
                 key={`${index}-${item.text}-marker`}
                 position={[item.location.lat, item.location.lng]}
@@ -335,7 +346,6 @@ function App() {
                 onMapClick={handleMapItemSelect}
                 isSelectedForMapping={selectedForMapping === index}
                 onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
                 onDrop={handleListDrop}
                 onDragEnd={handleDragEnd}
               />
