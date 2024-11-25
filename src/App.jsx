@@ -46,15 +46,37 @@ const clearAllData = async () => {
 };
 
 const saveToIndexedDB = async (items) => {
-  const db = await initDB();
-  await db.put(ITEMS_STORE, items, "items");
+  try {
+    const db = await initDB();
+    console.log(
+      "Saving items:",
+      items.map((i) => ({
+        id: i.id,
+        text: i.text,
+        hasClue: !!i.clue,
+        clueLength: i.clue?.length,
+      }))
+    );
+    await db.put(ITEMS_STORE, items, "items");
+  } catch (error) {
+    console.error("Error saving to IndexedDB:", error);
+  }
 };
 
 const loadFromIndexedDB = async () => {
   try {
     const db = await initDB();
-    const items = await db.get(ITEMS_STORE, "items");
-    return items || [];
+    const items = (await db.get(ITEMS_STORE, "items")) || [];
+    console.log(
+      "Loaded items:",
+      items.map((i) => ({
+        id: i.id,
+        text: i.text,
+        hasClue: !!i.clue,
+        clueLength: i.clue?.length,
+      }))
+    );
+    return items;
   } catch (error) {
     console.error("Error loading from IndexedDB:", error);
     return [];
@@ -555,6 +577,20 @@ function App() {
     };
     loadItems();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      console.log("Triggering save for items:", items.length);
+      // Ensure we're saving the complete item objects
+      const itemsToSave = items.map((item) => ({
+        id: item.id,
+        text: item.text,
+        clue: item.clue || "", // Ensure clue is at least an empty string
+        location: item.location,
+      }));
+      saveToIndexedDB(itemsToSave);
+    }
+  }, [items, isLoading]);
 
   // useEffect(() => {
   //   if (!selectedId && items.length > 0) {
