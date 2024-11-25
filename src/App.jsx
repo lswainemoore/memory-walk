@@ -5,7 +5,6 @@ import {
   MapContainer,
   TileLayer,
   Marker,
-  Popup,
   useMapEvents,
   useMap,
 } from "react-leaflet";
@@ -143,7 +142,6 @@ const MobileDrawer = ({
   editClue,
   onSelect,
   onListDrop,
-  resetButton,
 }) => {
   const selectedIndex = items.findIndex((item) => item.id === selectedId);
   const selectedItem = items.find((item) => item.id === selectedId);
@@ -530,16 +528,20 @@ function App() {
     const loadItems = async () => {
       const loadedItems = await loadFromIndexedDB();
       setItems(loadedItems);
+      // Auto-select first item if we have items and nothing is selected
+      if (loadedItems.length > 0 && !selectedId) {
+        setSelectedId(loadedItems[0].id);
+      }
       setIsLoading(false);
     };
     loadItems();
   }, []);
 
   useEffect(() => {
-    if (!isLoading) {
-      saveToIndexedDB(items);
+    if (!selectedId && items.length > 0 && window.innerWidth <= 768) {
+      setSelectedId(items[0].id);
     }
-  }, [items, isLoading]);
+  }, [items, selectedId]);
 
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
@@ -879,8 +881,13 @@ function App() {
         editClue={editClue}
         onSelect={onSelect}
         onListDrop={handleListDrop}
-        resetButton={resetButton}
       />
+
+      {isLoading && (
+        <div className="loading-overlay">
+          <div className="loading-spinner" />
+        </div>
+      )}
     </div>
   );
 }
