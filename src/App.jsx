@@ -15,6 +15,16 @@ import "./App.css";
 
 const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   const map = useMap();
+  
+  useEffect(() => {
+    map.locate()
+      .on('locationfound', (e) => {
+        map.flyTo(e.latlng, map.getZoom());
+      })
+      .on('locationerror', (e) => {
+        console.warn('Location access denied');
+      });
+  }, [map]);
 
   // Get the container element
   const container = map.getContainer();
@@ -219,6 +229,23 @@ function App() {
       tempUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [tempUrls]);
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setMapCenter([position.coords.latitude, position.coords.longitude]);
+        },
+        (error) => {
+          console.warn("Error getting location:", error);
+          setMapCenter([51.505, -0.09]); // London as fallback
+        }
+      );
+    } else {
+      console.warn("Geolocation not available");
+      setMapCenter([51.505, -0.09]); // London as fallback
+    }
+  }, []);
 
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
