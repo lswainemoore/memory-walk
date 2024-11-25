@@ -15,14 +15,15 @@ import "./App.css";
 
 const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   const map = useMap();
-  
+
   useEffect(() => {
-    map.locate()
-      .on('locationfound', (e) => {
+    map
+      .locate()
+      .on("locationfound", (e) => {
         map.flyTo(e.latlng, map.getZoom());
       })
-      .on('locationerror', (e) => {
-        console.warn('Location access denied');
+      .on("locationerror", (e) => {
+        console.warn("Location access denied");
       });
   }, [map]);
 
@@ -107,9 +108,23 @@ const Item = ({
               name="editClue"
               value={editClue}
               onChange={onEditChange}
+              onPaste={async (e) => {
+                const items = e.clipboardData.items;
+                for (let item of items) {
+                  if (item.type.startsWith("image")) {
+                    e.preventDefault();
+                    const file = item.getAsFile();
+                    if (file) {
+                      await handleImageUpload(file, editClue, onEditChange);
+                    }
+                    break;
+                  }
+                }
+              }}
               className="w-full h-32 rounded border p-2 font-mono text-sm"
-              placeholder="Add details with Markdown..."
+              placeholder="Add details with Markdown... (Paste images directly)"
             />
+
             <div className="flex space-x-2">
               <label className="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">
                 📁 Add Image
@@ -229,23 +244,6 @@ function App() {
       tempUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [tempUrls]);
-
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setMapCenter([position.coords.latitude, position.coords.longitude]);
-        },
-        (error) => {
-          console.warn("Error getting location:", error);
-          setMapCenter([51.505, -0.09]); // London as fallback
-        }
-      );
-    } else {
-      console.warn("Geolocation not available");
-      setMapCenter([51.505, -0.09]); // London as fallback
-    }
-  }, []);
 
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
