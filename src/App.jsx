@@ -36,20 +36,23 @@ const MobileDrawer = ({
   const selectedIndex = items.findIndex((item) => item.id === selectedId);
   const selectedItem = items.find((item) => item.id === selectedId);
 
+  const handlePrevious = () => {
+    if (selectedIndex > 0) {
+      onSelect(items[selectedIndex - 1].id);
+    }
+  };
+
+  const handleNext = () => {
+    if (selectedIndex < items.length - 1) {
+      onSelect(items[selectedIndex + 1].id);
+    }
+  };
+
   const handlers = useSwipeable({
-    onSwipedLeft: () => {
-      if (selectedIndex < items.length - 1) {
-        onSelect(items[selectedIndex + 1].id);
-      }
-    },
-    onSwipedRight: () => {
-      if (selectedIndex > 0) {
-        onSelect(items[selectedIndex - 1].id);
-      }
-    },
+    onSwipedLeft: handleNext,
+    onSwipedRight: handlePrevious,
     preventScrollOnSwipe: true,
     trackMouse: false,
-    swipeDuration: 500,
     delta: 10,
   });
 
@@ -75,20 +78,29 @@ const MobileDrawer = ({
 
       {selectedItem && (
         <>
-          {/* Subtle swipe indicators */}
           <div className="flex items-center justify-between px-4 py-2 text-sm font-medium">
             {selectedIndex > 0 ? (
-              <div className="text-blue-500">←</div>
+              <button
+                onClick={handlePrevious}
+                className="p-2 -mx-2 text-blue-500 hover:text-blue-600 focus:outline-none"
+              >
+                ←
+              </button>
             ) : (
-              <div className="w-4" />
+              <div className="w-8" />
             )}
             <div className="text-xs font-medium text-gray-500">
               {selectedIndex + 1} / {items.length}
             </div>
             {selectedIndex < items.length - 1 ? (
-              <div className="text-blue-500">→</div>
+              <button
+                onClick={handleNext}
+                className="p-2 -mx-2 text-blue-500 hover:text-blue-600 focus:outline-none"
+              >
+                →
+              </button>
             ) : (
-              <div className="w-4" />
+              <div className="w-8" />
             )}
           </div>
 
