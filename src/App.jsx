@@ -391,6 +391,44 @@ function App() {
     });
   };
 
+  const CustomPopup = ({ index, item }) => {
+    return (
+      <div className="popup-content min-w-[200px] max-w-[300px]">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white text-sm">
+            {index + 1}
+          </div>
+          <strong className="text-gray-900">{item.text}</strong>
+        </div>
+        {item.clue && (
+          <div className="prose prose-sm max-w-none border-t pt-2">
+            <ReactMarkdown
+              components={{
+                img: ({ node, ...props }) => (
+                  <img
+                    {...props}
+                    className="max-w-full h-auto rounded-lg shadow-sm my-2"
+                    alt={props.alt || "Location image"}
+                  />
+                ),
+                p: ({ node, ...props }) => <p {...props} className="my-2" />,
+              }}
+              urlTransform={(url) => {
+                // Handle blob URLs correctly
+                if (url.startsWith("blob:")) {
+                  return url;
+                }
+                return url;
+              }}
+            >
+              {item.clue}
+            </ReactMarkdown>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-screen w-screen">
       <div className="w-2/3 h-full">
@@ -418,10 +456,7 @@ function App() {
                   icon={createCustomIcon(index)}
                 >
                   <Popup>
-                    <strong>
-                      #{index + 1} {item.text}
-                    </strong>
-                    {item.clue && <p>{item.clue}</p>}
+                    <CustomPopup index={index} item={item} />
                   </Popup>
                 </Marker>
               )
