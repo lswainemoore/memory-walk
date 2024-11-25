@@ -26,7 +26,7 @@ import PositionSelector from "./PositionSelector";
 import { openDB } from "idb";
 
 // Add these constants and functions before the App component:
-const DB_NAME = "memoryWalkDB";
+const DB_NAME = "memoryLaneDB";
 const DB_VERSION = 1;
 const ITEMS_STORE = "items";
 const IMAGES_STORE = "images";
@@ -215,7 +215,7 @@ const exportData = async () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `memory-walk-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `memory-lane-export-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -337,7 +337,7 @@ const MobileToolbar = ({ onImport, onReset, items }) => {
     <div className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b md:hidden">
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-800">Memory Walk</h1>
+          <h1 className="text-xl font-bold text-gray-800">Memory Lane</h1>
           <div className="flex items-center gap-2">
             <ControlButtons
               onImport={onImport}
@@ -1086,7 +1086,7 @@ function App() {
       {/* Desktop Sidebar */}
       <div className="hidden md:block md:w-1/3 bg-white p-6 shadow-xl overflow-auto">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">Memory Walk</h1>
+          <h1 className="text-4xl font-bold text-gray-800">Memory Lane</h1>
           <ControlButtons
             onImport={handleImport}
             onReset={handleReset}
