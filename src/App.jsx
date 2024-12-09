@@ -157,50 +157,6 @@ const saveImageToStorage = async (projectId, file) => {
 //   }
 // };
 
-const importData = async (file) => {
-  try {
-    const text = await file.text();
-    const fileType = file.name.split(".").pop().toLowerCase();
-
-    if (fileType === "json") {
-      const importBundle = JSON.parse(text);
-
-      // Version check
-      if (!importBundle.version || importBundle.version !== 1) {
-        throw new Error("Unsupported export version");
-      }
-
-      // Save items to storage
-      await saveToStorage(importBundle.items);
-
-      return importBundle.items;
-    } else if (fileType === "csv") {
-      const rows = text.split("\n").map((row) => row.split(","));
-      const headers = rows[0];
-      const nameIndex = headers.indexOf("name");
-      const clueIndex = headers.indexOf("clue");
-
-      if (nameIndex === -1 || clueIndex === -1) {
-        throw new Error("CSV must contain 'name' and 'clue' columns");
-      }
-
-      const items = rows
-        .slice(1)
-        .map((row) => createItem(row[nameIndex], row[clueIndex]));
-
-      // Save items to storage
-      await saveToStorage(items);
-
-      return items;
-    } else {
-      throw new Error("Unsupported file type");
-    }
-  } catch (error) {
-    console.error("Import failed:", error);
-    throw error;
-  }
-};
-
 const createItem = (text, clue = "", location = null) => ({
   id: crypto.randomUUID(),
   text,
@@ -495,21 +451,6 @@ function App() {
     newItems.splice(targetIndex, 0, movedItem);
     setItems(newItems);
     setSelectedId(movedItem.id);
-  };
-
-  const handleImport = async (file) => {
-    if (window.confirm("Importing will replace all current data. Continue?")) {
-      try {
-        const importedItems = await importData(file);
-        setItems(importedItems);
-        if (importedItems.length > 0) {
-          setSelectedId(importedItems[0].id);
-        }
-      } catch (error) {
-        console.error("Import failed:", error);
-        throw error;
-      }
-    }
   };
 
   const createCustomIcon = (id, isSelected) => {
