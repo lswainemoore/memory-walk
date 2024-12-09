@@ -23,64 +23,69 @@ import "./App.css";
 
 import PositionSelector from "./PositionSelector";
 
-import { openDB } from "idb";
-
-// Add these constants and functions before the App component:
-const DB_NAME = "memoryLaneDB";
-const DB_VERSION = 1;
-const ITEMS_STORE = "items";
-
-const initDB = async () => {
-  const db = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Only create items store
-      if (!db.objectStoreNames.contains(ITEMS_STORE)) {
-        db.createObjectStore(ITEMS_STORE);
-      }
-    },
-  });
-  return db;
+const ITEMS_FILENAME = "items.json";
+const getItemsUrl = () => {
+  const subdomain = process.env.NEXT_PUBLIC_BLOB_SUBDOMAIN;
+  if (!subdomain) {
+    throw new Error(
+      "NEXT_PUBLIC_BLOB_SUBDOMAIN environment variable is not set"
+    );
+  }
+  return `https://${subdomain}.public.blob.vercel-storage.com/${ITEMS_FILENAME}`;
 };
 
 const clearAllData = async () => {
-  const db = await initDB();
-  await db.clear(ITEMS_STORE);
-};
-
-const saveToIndexedDB = async (items) => {
   try {
-    const db = await initDB();
-    // console.log(
-    //   "Saving items:",
-    //   items.map((i) => ({
-    //     id: i.id,
-    //     text: i.text,
-    //     hasClue: !!i.clue,
-    //     clueLength: i.clue?.length,
-    //   }))
-    // );
-    await db.put(ITEMS_STORE, items, "items");
+    await saveToStorage([]); // Save empty array to clear data
   } catch (error) {
-    console.error("Error saving to IndexedDB:", error);
+    console.error("Error clearing data:", error);
+    throw error;
   }
 };
 
-const loadFromIndexedDB = async () => {
+const saveToStorage = async (items) => {
   try {
-    const db = await initDB();
-    const items = (await db.get(ITEMS_STORE, "items")) || [];
+    const response = await fetch("/api/items", {
+      method: "POST",
+      body: JSON.stringify(items),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Error saving to storage:", error);
+    throw error;
+  }
+};
+
+const loadFromStorage = async () => {
+  try {
+    const response = await fetch("/api/items");
+    if (!response.ok) {
+      if (response.status === 404) return [];
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const items = await response.json();
     console.log(
       "Loaded items:",
-      items.map((i) => ({
+      items?.map((i) => ({
         id: i.id,
         text: i.text,
         hasClue: !!i.clue,
         clueLength: i.clue?.length,
       }))
     );
-    return items;
+    return items || [];
   } catch (error) {
-    console.error("Error loading from IndexedDB:", error);
+    console.error("Error loading from storage:", error);
     return [];
   }
 };
@@ -101,17 +106,16 @@ const saveImageToStorage = async (file) => {
 
 const exportData = async () => {
   try {
-    const db = await initDB();
-    const items = (await db.get(ITEMS_STORE, "items")) || [];
+    const itemsUrl = getItemsUrl();
+    const response = await fetch(itemsUrl);
+    const items = await response.json();
 
-    // We don't need to handle images separately anymore since they're URLs
     const exportBundle = {
       version: 1,
       timestamp: new Date().toISOString(),
       items,
     };
 
-    // Create and download file
     const blob = new Blob([JSON.stringify(exportBundle)], {
       type: "application/json",
     });
@@ -138,9 +142,7 @@ const exportData = async () => {
 const handleExport = async () => {
   try {
     const result = await exportData();
-    alert(
-      `Export successful!\nExported ${result.itemCount} items.`
-    );
+    alert(`Export successful!\nExported ${result.itemCount} items.`);
   } catch (error) {
     alert("Export failed: " + error.message);
   }
@@ -159,16 +161,11 @@ const importData = async (file) => {
         throw new Error("Unsupported export version");
       }
 
-      // Clear existing data
-      const db = await initDB();
-      await db.clear(ITEMS_STORE);
-
-      // Import items (images are already URLs)
-      await db.put(ITEMS_STORE, importBundle.items, "items");
+      // Save items to storage
+      await saveToStorage(importBundle.items);
 
       return importBundle.items;
     } else if (fileType === "csv") {
-      // CSV import remains the same
       const rows = text.split("\n").map((row) => row.split(","));
       const headers = rows[0];
       const nameIndex = headers.indexOf("name");
@@ -182,9 +179,8 @@ const importData = async (file) => {
         .slice(1)
         .map((row) => createItem(row[nameIndex], row[clueIndex]));
 
-      const db = await initDB();
-      await db.clear(ITEMS_STORE);
-      await db.put(ITEMS_STORE, items, "items");
+      // Save items to storage
+      await saveToStorage(items);
 
       return items;
     } else {
@@ -695,7 +691,7 @@ function App() {
 
   useEffect(() => {
     const loadItems = async () => {
-      const loadedItems = await loadFromIndexedDB();
+      const loadedItems = await loadFromStorage();
       setItems(loadedItems);
       // Auto-select first item if we have items and nothing is selected
       if (loadedItems.length > 0 && !selectedId) {
@@ -716,17 +712,17 @@ function App() {
         clue: item.clue || "", // Ensure clue is at least an empty string
         location: item.location,
       }));
-      saveToIndexedDB(itemsToSave);
+      saveToStorage(itemsToSave).catch(console.error);
     }
   }, [items, isLoading]);
 
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
       const imageUrl = await saveImageToStorage(file);
-      
+
       // Add the image URL directly to the markdown
       const imageMarkdown = `\n![${file.name}](${imageUrl})\n`;
-  
+
       onEditChange({
         target: {
           name: "editClue",
