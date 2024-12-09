@@ -1,26 +1,25 @@
 {
-  "name": "vite-react",
+  "name": "memory-lane",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "dependencies": {
     "idb": "^8.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "next": "^15.0.4",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
     "react-icons": "^5.3.0",
-    "react-leaflet": "^4.2.1",
+    "react-leaflet": "v5.0.0-rc.1",
     "react-markdown": "^9.0.1",
     "react-swipeable": "^7.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
-    "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
@@ -28,7 +27,6 @@
     "globals": "^15.9.0",
     "postcss": "^8.4.49",
     "prettier": "^3.3.3",
-    "tailwindcss": "^3.4.15",
-    "vite": "^5.4.1"
+    "tailwindcss": "^3.4.15"
   }
 }
