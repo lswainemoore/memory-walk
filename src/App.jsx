@@ -87,14 +87,15 @@ const loadFromStorage = async (projectId) => {
   }
 };
 
-const saveImageToStorage = async (file) => {
+const saveImageToStorage = async (projectId, file) => {
   try {
-    const response = await fetch(`/api/image/upload?filename=${file.name}`, {
+    const filename = `${projectId}/${file.name}`;
+    const response = await fetch(`/api/image/upload?filename=${filename}`, {
       method: "POST",
       body: file,
     });
     const newBlob = await response.json();
-    return newBlob.url; // Return the URL directly
+    return newBlob.url;
   } catch (error) {
     console.error("Error uploading to blob storage:", error);
     throw error;
@@ -310,7 +311,7 @@ function App() {
 
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
-      const imageUrl = await saveImageToStorage(file);
+      const imageUrl = await saveImageToStorage(projectId, file);
 
       // Add the image URL directly to the markdown
       const imageMarkdown = `\n![${file.name}](${imageUrl})\n`;
@@ -670,3 +671,10 @@ function App() {
 }
 
 export default App;
+
+// TODO
+// - put the images in properly named folders
+// - clear data (images + json)
+// - metadata (title, created, updated)
+// - deal with conflicts (check version id we're overwriting is right, then decide.
+//   alternatively, use modified time)
