@@ -303,6 +303,9 @@ function App() {
       }));
       saveWithOverwrite(itemsToSave);
     }
+    // lincoln note: it's a bit funny to not have saveWithOverwrite here 
+    // as a dependency, but I think ti would cause thrashing. it's a little unsafe to do like this
+    // tbh, but I think it works fine? I think really we may need lastModified to be a ref.
   }, [items, isLoading, projectId]);
 
   const loadProject = (newProjectId) => {
