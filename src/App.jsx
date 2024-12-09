@@ -13,6 +13,7 @@ import "leaflet/dist/leaflet.css";
 
 import "./App.css";
 
+import ConflictModal from "./components/ConflictModal";
 import ControlButtons from "./components/ControlButtons";
 import MobileDrawer from "./components/MobileDrawer";
 import MobileToolbar from "./components/MobileToolbar";
@@ -244,6 +245,8 @@ function App() {
   const [selectedForMapping, setSelectedForMapping] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const itemsContainerRef = useRef(null);
+  const [showConflict, setShowConflict] = useState(false);
+  const [pendingSave, setPendingSave] = useState(null);
 
   useEffect(() => {
     const storedId = getStoredProjectId();
@@ -268,6 +271,27 @@ function App() {
     }
   }, [projectId]);
 
+  const saveWithOverwrite = async (itemsToSave, skipVersionCheck = false) => {
+    try {
+      const result = await saveToStorage(
+        itemsToSave,
+        projectId,
+        skipVersionCheck ? null : lastModified
+      );
+      setLastModified(result.modified);
+    } catch (error) {
+      if (
+        !skipVersionCheck &&
+        error.message === "Data has been modified since last fetch"
+      ) {
+        setShowConflict(true);
+        setPendingSave(itemsToSave);
+      } else {
+        console.error(error);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!isLoading && projectId) {
       console.log("Saving items for project:", projectId);
@@ -277,21 +301,9 @@ function App() {
         clue: item.clue || "",
         location: item.location,
       }));
-      saveToStorage(itemsToSave, projectId, lastModified)
-        .then((result) => {
-          setLastModified(result.modified); // Update lastModified after successful save
-        })
-        .catch((error) => {
-          if (error.message === "Data has been modified since last fetch") {
-            alert(
-              "This project has been modified elsewhere. Please refresh to get the latest version."
-            );
-          } else {
-            console.error(error);
-          }
-        });
+      saveWithOverwrite(itemsToSave);
     }
-  }, [items, isLoading, projectId]); // lastModified not in deps to avoid thrashing
+  }, [items, isLoading, projectId]);
 
   const loadProject = (newProjectId) => {
     setStoredProjectId(newProjectId);
@@ -597,6 +609,24 @@ function App() {
         editClue={editClue}
         onSelect={onSelect}
         onListDrop={handleListDrop}
+      />
+      <ConflictModal
+        isOpen={showConflict}
+        onClose={() => setShowConflict(false)}
+        onRefresh={async () => {
+          setShowConflict(false);
+          setPendingSave(null);
+          const data = await loadFromStorage(projectId);
+          setItems(data?.items || []);
+          setLastModified(data?.modified || null);
+        }}
+        onOverwrite={async () => {
+          if (pendingSave) {
+            await saveWithOverwrite(pendingSave, true); // Skip version check
+            setShowConflict(false);
+            setPendingSave(null);
+          }
+        }}
       />
       {isLoading && (
         <div className="loading-overlay">
