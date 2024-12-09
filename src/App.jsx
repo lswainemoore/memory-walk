@@ -29,17 +29,13 @@ import { openDB } from "idb";
 const DB_NAME = "memoryLaneDB";
 const DB_VERSION = 1;
 const ITEMS_STORE = "items";
-const IMAGES_STORE = "images";
 
 const initDB = async () => {
   const db = await openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      // Create stores if they don't exist
+      // Only create items store
       if (!db.objectStoreNames.contains(ITEMS_STORE)) {
         db.createObjectStore(ITEMS_STORE);
-      }
-      if (!db.objectStoreNames.contains(IMAGES_STORE)) {
-        db.createObjectStore(IMAGES_STORE);
       }
     },
   });
@@ -48,9 +44,7 @@ const initDB = async () => {
 
 const clearAllData = async () => {
   const db = await initDB();
-
-  // Clear all stores
-  await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
+  await db.clear(ITEMS_STORE);
 };
 
 const saveToIndexedDB = async (items) => {
@@ -91,122 +85,31 @@ const loadFromIndexedDB = async () => {
   }
 };
 
-const saveImageToIndexedDB = async (imageId, imageBlob) => {
-  const db = await initDB();
-  await db.put(IMAGES_STORE, imageBlob, imageId);
-  return imageId;
-};
-
-const loadImageFromIndexedDB = async (imageId) => {
-  const db = await initDB();
-  const imageBlob = await db.get(IMAGES_STORE, imageId);
-  if (imageBlob) {
-    return URL.createObjectURL(imageBlob);
+const saveImageToStorage = async (file) => {
+  try {
+    const response = await fetch(`/api/image/upload?filename=${file.name}`, {
+      method: "POST",
+      body: file,
+    });
+    const newBlob = await response.json();
+    return newBlob.url; // Return the URL directly
+  } catch (error) {
+    console.error("Error uploading to blob storage:", error);
+    throw error;
   }
-  return null;
 };
 
-const processStoredImages = async (markdown) => {
-  if (!markdown) return markdown;
-
-  const regex = /!\[([^\]]*)\]\(stored:([^)]+)\)/g;
-  let match;
-  let processedMarkdown = markdown;
-
-  while ((match = regex.exec(markdown)) !== null) {
-    const [fullMatch, altText, imageId] = match;
-    const imageUrl = await loadImageFromIndexedDB(imageId);
-    if (imageUrl) {
-      processedMarkdown = processedMarkdown.replace(
-        fullMatch,
-        `![${altText}](${imageUrl})`
-      );
-    }
-  }
-
-  return processedMarkdown;
-};
-
-const findImagesInItems = (items) => {
-  const imageMap = new Map();
-  const regex = /!\[([^\]]*)\]\(stored:([^)]+)\)/g;
-
-  items.forEach((item, index) => {
-    if (item.clue) {
-      let match;
-      while ((match = regex.exec(item.clue)) !== null) {
-        const [fullMatch, altText, imageId] = match;
-        imageMap.set(imageId, {
-          itemIndex: index,
-          itemText: item.text,
-          altText,
-        });
-      }
-    }
-  });
-
-  return imageMap;
-};
-
-// Now modify the exportData function
 const exportData = async () => {
   try {
-    // Get all data from IndexedDB
     const db = await initDB();
     const items = (await db.get(ITEMS_STORE, "items")) || [];
 
-    // Debug: Log some items info
-    console.log(`Total items: ${items.length}`);
-    console.log("Items with clues:", items.filter((item) => item.clue).length);
-
-    // Get image mapping
-    const imageMap = findImagesInItems(items);
-    console.log(
-      "Found images:",
-      Array.from(imageMap.entries()).map(([id, info]) => ({
-        id,
-        itemText: info.itemText,
-        altText: info.altText,
-      }))
-    );
-
-    // Create export bundle with images
-    const images = {};
-    for (const [imageId, info] of imageMap.entries()) {
-      const imageBlob = await db.get(IMAGES_STORE, imageId);
-      if (imageBlob) {
-        const properBlob = new Blob([imageBlob], {
-          type: imageBlob.type || "image/jpeg",
-        });
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(properBlob);
-        });
-        images[imageId] = base64;
-        console.log(`Processed image ${imageId} from item "${info.itemText}"`);
-      } else {
-        console.warn(
-          `Image ${imageId} referenced in item "${info.itemText}" not found in storage`
-        );
-      }
-    }
-
+    // We don't need to handle images separately anymore since they're URLs
     const exportBundle = {
       version: 1,
       timestamp: new Date().toISOString(),
       items,
-      images,
     };
-
-    // Debug: Log export info
-    console.log("Export bundle:", {
-      itemCount: items.length,
-      imageCount: Object.keys(images).length,
-      itemsWithClues: items.filter((item) => item.clue).length,
-      totalBundleSize: JSON.stringify(exportBundle).length,
-    });
 
     // Create and download file
     const blob = new Blob([JSON.stringify(exportBundle)], {
@@ -223,7 +126,6 @@ const exportData = async () => {
 
     return {
       success: true,
-      imageCount: Object.keys(images).length,
       itemCount: items.length,
       itemsWithClues: items.filter((item) => item.clue).length,
     };
@@ -237,7 +139,7 @@ const handleExport = async () => {
   try {
     const result = await exportData();
     alert(
-      `Export successful!\nExported ${result.itemCount} items and ${result.imageCount} images.`
+      `Export successful!\nExported ${result.itemCount} items.`
     );
   } catch (error) {
     alert("Export failed: " + error.message);
@@ -259,20 +161,14 @@ const importData = async (file) => {
 
       // Clear existing data
       const db = await initDB();
-      await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
+      await db.clear(ITEMS_STORE);
 
-      // Import images first
-      for (const [imageId, base64] of Object.entries(importBundle.images)) {
-        const response = await fetch(base64);
-        const blob = await response.blob();
-        await db.put(IMAGES_STORE, blob, imageId);
-      }
-
-      // Import items
+      // Import items (images are already URLs)
       await db.put(ITEMS_STORE, importBundle.items, "items");
 
       return importBundle.items;
     } else if (fileType === "csv") {
+      // CSV import remains the same
       const rows = text.split("\n").map((row) => row.split(","));
       const headers = rows[0];
       const nameIndex = headers.indexOf("name");
@@ -286,11 +182,8 @@ const importData = async (file) => {
         .slice(1)
         .map((row) => createItem(row[nameIndex], row[clueIndex]));
 
-      // Clear existing data
       const db = await initDB();
-      await Promise.all([db.clear(ITEMS_STORE), db.clear(IMAGES_STORE)]);
-
-      // Import items
+      await db.clear(ITEMS_STORE);
       await db.put(ITEMS_STORE, items, "items");
 
       return items;
@@ -606,19 +499,6 @@ const Item = ({
   totalItems,
   onListDrop,
 }) => {
-  const [processedClue, setProcessedClue] = useState(item.clue);
-  useEffect(() => {
-    const processClue = async () => {
-      if (item.clue) {
-        const processed = await processStoredImages(item.clue);
-        setProcessedClue(processed);
-      } else {
-        setProcessedClue("");
-      }
-    };
-    processClue();
-  }, [item.clue]);
-
   return (
     <li
       className={`list-none mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 
@@ -789,7 +669,7 @@ const Item = ({
                     return value;
                   }}
                 >
-                  {processedClue}
+                  {item.clue}
                 </ReactMarkdown>
               </div>
             )}
@@ -812,15 +692,6 @@ function App() {
   const [selectedForMapping, setSelectedForMapping] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const itemsContainerRef = useRef(null);
-
-  const [tempUrls, setTempUrls] = useState(new Set()); // Track URLs to revoke
-
-  // Clean up URLs when component unmounts
-  useEffect(() => {
-    return () => {
-      tempUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [tempUrls]);
 
   useEffect(() => {
     const loadItems = async () => {
@@ -851,19 +722,11 @@ function App() {
 
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
-      // Generate a unique ID for the image
-      const imageId = `image-${crypto.randomUUID()}`;
-
-      // Save the image to IndexedDB
-      await saveImageToIndexedDB(imageId, file);
-
-      // Create a temporary URL for immediate display
-      const tempUrl = URL.createObjectURL(file);
-      setTempUrls((prev) => new Set(prev).add(tempUrl));
-
-      // Add a special marker in the markdown to identify our stored images
-      const imageMarkdown = `\n![${file.name}](stored:${imageId})\n`;
-
+      const imageUrl = await saveImageToStorage(file);
+      
+      // Add the image URL directly to the markdown
+      const imageMarkdown = `\n![${file.name}](${imageUrl})\n`;
+  
       onEditChange({
         target: {
           name: "editClue",
@@ -872,6 +735,7 @@ function App() {
       });
     } catch (error) {
       console.error("Error processing image:", error);
+      alert("Failed to upload image. Please try again.");
     }
   };
 
@@ -1080,10 +944,6 @@ function App() {
         setEditText("");
         setEditClue("");
         setSelectedForMapping(null);
-
-        // Clear any temporary URLs
-        tempUrls.forEach((url) => URL.revokeObjectURL(url));
-        setTempUrls(new Set());
 
         alert("All data has been cleared successfully.");
       } catch (error) {
