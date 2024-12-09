@@ -30,20 +30,32 @@ const setStoredProjectId = (projectId) => {
   return projectId;
 };
 
-const clearAllData = async () => {
-  try {
-    await saveToStorage([]); // Save empty array to clear data
-  } catch (error) {
-    console.error("Error clearing data:", error);
-    throw error;
-  }
-};
+// const clearAllData = async () => {
+//   try {
+//     await saveToStorage([]); // Save empty array to clear data
+//   } catch (error) {
+//     console.error("Error clearing data:", error);
+//     throw error;
+//   }
+// };
 
 const saveToStorage = async (items, projectId) => {
   try {
+    const currentTime = new Date().toISOString();
+
+    // Get existing data to preserve created time if it exists
+    const existingData = await loadFromStorage(projectId);
+    const createdTime = existingData?.created || currentTime;
+
+    const data = {
+      items: items,
+      created: createdTime,
+      modified: currentTime,
+    };
+
     const response = await fetch(`/api/items?project=${projectId}`, {
       method: "POST",
-      body: JSON.stringify(items),
+      body: JSON.stringify(data),
       headers: {
         "Content-Type": "application/json",
       },
@@ -65,25 +77,24 @@ const loadFromStorage = async (projectId) => {
   try {
     const response = await fetch(`/api/items?project=${projectId}`);
     if (!response.ok) {
-      if (response.status === 404) return [];
+      if (response.status === 404) return null;
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const items = await response.json();
-    console.log(
-      "Loaded items for project",
-      projectId,
-      items?.map((i) => ({
-        id: i.id,
-        text: i.text,
-        hasClue: !!i.clue,
-        clueLength: i.clue?.length,
-      }))
-    );
-    return items || [];
+    const data = await response.json();
+    if (!data) return null;
+
+    // Log metadata for debugging
+    console.log("Project metadata:", {
+      created: new Date(data.created).toLocaleString(),
+      modified: new Date(data.modified).toLocaleString(),
+      itemCount: data.items?.length || 0,
+    });
+
+    return data;
   } catch (error) {
     console.error("Error loading from storage:", error);
-    return [];
+    return null;
   }
 };
 
@@ -280,12 +291,13 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const loadItems = async () => {
+      const data = await loadFromStorage(projectId);
+      // Extract items from the data structure
+      setItems(data?.items || []);
+      setIsLoading(false);
+    };
     if (projectId) {
-      const loadItems = async () => {
-        const loadedItems = await loadFromStorage(projectId);
-        setItems(loadedItems);
-        setIsLoading(false);
-      };
       loadItems();
     }
   }, [projectId]);
@@ -516,32 +528,6 @@ function App() {
     setEditIndex(null);
   };
 
-  const handleReset = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to clear all data? This cannot be undone!"
-      )
-    ) {
-      try {
-        // Clear IndexedDB
-        await clearAllData();
-
-        // Reset all state
-        setItems([]);
-        setSelectedId(null);
-        setEditIndex(null);
-        setEditText("");
-        setEditClue("");
-        setSelectedForMapping(null);
-
-        alert("All data has been cleared successfully.");
-      } catch (error) {
-        console.error("Error clearing data:", error);
-        alert("There was an error clearing the data. Please try again.");
-      }
-    }
-  };
-
   return (
     <div className="flex h-screen w-screen">
       <div className="flex-grow h-full md:w-2/3">
@@ -577,13 +563,7 @@ function App() {
       <div className="hidden md:block md:w-1/3 bg-white p-6 shadow-xl overflow-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-4xl font-bold text-gray-800">Memory Lane</h1>
-          <ControlButtons
-            onImport={handleImport}
-            onReset={handleReset}
-            items={items}
-            projectId={projectId}
-            onLoadProject={loadProject}
-          />
+          <ControlButtons projectId={projectId} onLoadProject={loadProject} />
         </div>
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <form onSubmit={handleSubmit} className="flex space-x-4">
@@ -634,13 +614,7 @@ function App() {
           </ol>
         </div>
       </div>
-      <MobileToolbar
-        onImport={handleImport}
-        onReset={handleReset}
-        items={items}
-        projectId={projectId}
-        onLoadProject={loadProject}
-      />
+      <MobileToolbar projectId={projectId} onLoadProject={loadProject} />
       <MobileDrawer
         items={items}
         selectedId={selectedId}
@@ -673,8 +647,10 @@ function App() {
 export default App;
 
 // TODO
-// - put the images in properly named folders
+// x put the images in properly named folders
 // - clear data (images + json)
-// - metadata (title, created, updated)
+// x metadata (created, updated)
+// - user-settable project metadata (title, description)
 // - deal with conflicts (check version id we're overwriting is right, then decide.
 //   alternatively, use modified time)
+// - zoom to where there are markers
