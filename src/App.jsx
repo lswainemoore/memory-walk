@@ -650,3 +650,6 @@ export default App;
 // - deal with conflicts (check version id we're overwriting is right, then decide.
 //   alternatively, use modified time)
 // - zoom to where there are markers
+// - add the csv import back in
+// - right now the conflict resolution is a little aggressive, because I think we
+//   write when we load first. so we should be less aggressive about that, or actually check for changes.
