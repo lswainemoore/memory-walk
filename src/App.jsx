@@ -1,14 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  FaPencilAlt,
-  FaTrash,
-  FaMapMarkerAlt,
-  FaBars,
-  FaFileExport,
-  FaFileUpload,
-  FaRedoAlt,
-} from "react-icons/fa";
-import ReactMarkdown from "react-markdown";
+import { useState, useEffect, useRef } from "react";
+
 import {
   MapContainer,
   TileLayer,
@@ -16,22 +7,27 @@ import {
   useMapEvents,
   useMap,
 } from "react-leaflet";
-import { useSwipeable } from "react-swipeable";
+
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
+
 import "./App.css";
 
-import PositionSelector from "./PositionSelector";
+import ControlButtons from "./components/ControlButtons";
+import MobileDrawer from "./components/MobileDrawer";
+import MobileToolbar from "./components/MobileToolbar";
+import Item from "./components/Item";
+import { generateProjectId } from "./utils";
 
-const ITEMS_FILENAME = "items.json";
-const getItemsUrl = () => {
-  const subdomain = process.env.NEXT_PUBLIC_BLOB_SUBDOMAIN;
-  if (!subdomain) {
-    throw new Error(
-      "NEXT_PUBLIC_BLOB_SUBDOMAIN environment variable is not set"
-    );
-  }
-  return `https://${subdomain}.public.blob.vercel-storage.com/${ITEMS_FILENAME}`;
+const PROJECT_ID_KEY = "memoryLaneProjectId";
+
+const getStoredProjectId = () => {
+  return localStorage.getItem(PROJECT_ID_KEY);
+};
+
+const setStoredProjectId = (projectId) => {
+  localStorage.setItem(PROJECT_ID_KEY, projectId);
+  return projectId;
 };
 
 const clearAllData = async () => {
@@ -43,9 +39,9 @@ const clearAllData = async () => {
   }
 };
 
-const saveToStorage = async (items) => {
+const saveToStorage = async (items, projectId) => {
   try {
-    const response = await fetch("/api/items", {
+    const response = await fetch(`/api/items?project=${projectId}`, {
       method: "POST",
       body: JSON.stringify(items),
       headers: {
@@ -65,9 +61,9 @@ const saveToStorage = async (items) => {
   }
 };
 
-const loadFromStorage = async () => {
+const loadFromStorage = async (projectId) => {
   try {
-    const response = await fetch("/api/items");
+    const response = await fetch(`/api/items?project=${projectId}`);
     if (!response.ok) {
       if (response.status === 404) return [];
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -75,7 +71,8 @@ const loadFromStorage = async () => {
 
     const items = await response.json();
     console.log(
-      "Loaded items:",
+      "Loaded items for project",
+      projectId,
       items?.map((i) => ({
         id: i.id,
         text: i.text,
@@ -104,49 +101,49 @@ const saveImageToStorage = async (file) => {
   }
 };
 
-const exportData = async () => {
-  try {
-    const itemsUrl = getItemsUrl();
-    const response = await fetch(itemsUrl);
-    const items = await response.json();
+// const exportData = async () => {
+//   try {
+//     const itemsUrl = getItemsUrl();
+//     const response = await fetch(itemsUrl);
+//     const items = await response.json();
 
-    const exportBundle = {
-      version: 1,
-      timestamp: new Date().toISOString(),
-      items,
-    };
+//     const exportBundle = {
+//       version: 1,
+//       timestamp: new Date().toISOString(),
+//       items,
+//     };
 
-    const blob = new Blob([JSON.stringify(exportBundle)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `memory-lane-export-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+//     const blob = new Blob([JSON.stringify(exportBundle)], {
+//       type: "application/json",
+//     });
+//     const url = URL.createObjectURL(blob);
+//     const a = document.createElement("a");
+//     a.href = url;
+//     a.download = `memory-lane-export-${new Date().toISOString().slice(0, 10)}.json`;
+//     document.body.appendChild(a);
+//     a.click();
+//     document.body.removeChild(a);
+//     URL.revokeObjectURL(url);
 
-    return {
-      success: true,
-      itemCount: items.length,
-      itemsWithClues: items.filter((item) => item.clue).length,
-    };
-  } catch (error) {
-    console.error("Export failed:", error);
-    throw error;
-  }
-};
+//     return {
+//       success: true,
+//       itemCount: items.length,
+//       itemsWithClues: items.filter((item) => item.clue).length,
+//     };
+//   } catch (error) {
+//     console.error("Export failed:", error);
+//     throw error;
+//   }
+// };
 
-const handleExport = async () => {
-  try {
-    const result = await exportData();
-    alert(`Export successful!\nExported ${result.itemCount} items.`);
-  } catch (error) {
-    alert("Export failed: " + error.message);
-  }
-};
+// const handleExport = async () => {
+//   try {
+//     const result = await exportData();
+//     alert(`Export successful!\nExported ${result.itemCount} items.`);
+//   } catch (error) {
+//     alert("Export failed: " + error.message);
+//   }
+// };
 
 const importData = async (file) => {
   try {
@@ -198,222 +195,6 @@ const createItem = (text, clue = "", location = null) => ({
   clue,
   location,
 });
-
-const ControlButtons = ({ onImport, onReset, items }) => {
-  const fileInputRef = useRef();
-  const [isExporting, setIsExporting] = useState(false);
-
-  const handleExportClick = async () => {
-    setIsExporting(true);
-    try {
-      await handleExport();
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  return (
-    <div className="flex gap-1">
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        accept="application/json,text/csv"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            try {
-              await onImport(file);
-              alert("Import successful!");
-            } catch (error) {
-              alert("Import failed: " + error.message);
-            }
-            e.target.value = "";
-          }
-        }}
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        className="p-2"
-        title="Import"
-      >
-        <FaFileUpload />
-      </button>
-      <button
-        onClick={handleExportClick}
-        disabled={isExporting}
-        className="p-2"
-        title="Export"
-      >
-        <FaFileExport />
-      </button>
-      {items?.length > 0 && (
-        <button onClick={onReset} className="p-2" title="Reset">
-          <FaRedoAlt />
-        </button>
-      )}
-    </div>
-  );
-};
-
-const MobileToolbar = ({ onImport, onReset, items }) => {
-  return (
-    <div className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm border-b md:hidden">
-      <div className="px-4 py-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-800">Memory Lane</h1>
-          <div className="flex items-center gap-2">
-            <ControlButtons
-              onImport={onImport}
-              onReset={onReset}
-              items={items}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const MobileDrawer = ({
-  items,
-  selectedId,
-  newItemName,
-  onNewItemNameChange,
-  onNewItemSubmit,
-  onEditChange,
-  onEditSubmit,
-  onEditClick,
-  onDelete,
-  onCancelEdit,
-  onMapClick,
-  selectedForMapping,
-  handleImageUpload,
-  editIndex,
-  editText,
-  editClue,
-  onSelect,
-  onListDrop,
-}) => {
-  const selectedIndex = items.findIndex((item) => item.id === selectedId);
-  const selectedItem = items.find((item) => item.id === selectedId);
-
-  const handlePrevious = () => {
-    if (selectedIndex > 0) {
-      onSelect(items[selectedIndex - 1].id);
-    }
-  };
-
-  const handleNext = () => {
-    if (selectedIndex < items.length - 1) {
-      onSelect(items[selectedIndex + 1].id);
-    }
-  };
-
-  const handlers = useSwipeable({
-    onSwipedLeft: handleNext,
-    onSwipedRight: handlePrevious,
-    preventScrollOnSwipe: true,
-    trackMouse: false,
-    delta: 10,
-  });
-
-  const handleToggle = () => {
-    if (selectedId) {
-      onSelect(null); // Collapse
-    } else if (items.length > 0) {
-      onSelect(items[0].id); // Expand and select first item
-    }
-  };
-
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white shadow-lg md:hidden">
-      {/* Add handle for collapse/expand */}
-      <div className="cursor-pointer hover:bg-gray-50" onClick={handleToggle}>
-        <div className={`drawer-handle ${!selectedId ? "collapsed" : ""}`} />
-      </div>
-
-      <div className="px-4 py-3 border-b">
-        <form onSubmit={onNewItemSubmit} className="flex gap-2">
-          <input
-            type="text"
-            value={newItemName}
-            onChange={onNewItemNameChange}
-            placeholder="Add new item"
-            className="flex-1 rounded border px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          />
-          <button
-            type="submit"
-            className="rounded bg-blue-500 px-5 py-2 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          >
-            Add
-          </button>
-        </form>
-      </div>
-
-      {/* Wrap the item view in a transition */}
-      <div
-        className={`transition-all duration-300 ease-in-out ${
-          selectedId
-            ? "max-h-[60vh] opacity-100"
-            : "max-h-0 opacity-0 overflow-hidden"
-        }`}
-      >
-        {selectedItem && (
-          <>
-            <div className="flex items-center justify-between px-4 py-2 text-sm font-medium">
-              {selectedIndex > 0 ? (
-                <button
-                  onClick={handlePrevious}
-                  className="p-2 -mx-2 text-blue-500 hover:text-blue-600 focus:outline-none"
-                >
-                  ←
-                </button>
-              ) : (
-                <div className="w-8" />
-              )}
-              <div className="text-xs font-medium text-gray-500">
-                {selectedIndex + 1} / {items.length}
-              </div>
-              {selectedIndex < items.length - 1 ? (
-                <button
-                  onClick={handleNext}
-                  className="p-2 -mx-2 text-blue-500 hover:text-blue-600 focus:outline-none"
-                >
-                  →
-                </button>
-              ) : (
-                <div className="w-8" />
-              )}
-            </div>
-
-            <div {...handlers} className="overflow-y-auto px-4 pb-4">
-              <Item
-                item={selectedItem}
-                index={selectedIndex}
-                isEditing={editIndex === selectedIndex}
-                editText={editText}
-                editClue={editClue}
-                onEditChange={onEditChange}
-                onEditSubmit={onEditSubmit}
-                onEditClick={() => onEditClick(selectedIndex)}
-                onDelete={() => onDelete(selectedIndex)}
-                onCancelEdit={onCancelEdit}
-                onMapClick={() => onMapClick(selectedIndex)}
-                isSelectedForMapping={selectedForMapping === selectedIndex}
-                isSelected={true}
-                handleImageUpload={handleImageUpload}
-                totalItems={items.length}
-                onListDrop={onListDrop}
-                isMobile={true}
-              />
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   const map = useMap();
@@ -472,212 +253,9 @@ const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   return null;
 };
 
-const Item = ({
-  item,
-  index,
-  isEditing,
-  isSelected,
-  editText,
-  editClue,
-  onEditChange,
-  onEditSubmit,
-  onEditClick,
-  onDelete,
-  onCancelEdit,
-  onMapClick,
-  isSelectedForMapping,
-  onDragStart,
-  onDrop,
-  onDragEnd,
-  onItemClick,
-  handleImageUpload,
-  isMobile,
-  totalItems,
-  onListDrop,
-}) => {
-  return (
-    <li
-      className={`list-none mb-4 rounded-lg bg-white p-4 shadow-md transition-all duration-200 
-    ${isSelectedForMapping ? "ring-2 ring-blue-500 bg-blue-50" : ""} 
-    ${isSelected ? "md:ring-2 md:ring-blue-500 md:shadow-lg" : ""}
-    hover:shadow-lg`}
-      draggable="true"
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", index.toString());
-        onDragStart(e, index);
-      }}
-      onDragEnd={onDragEnd}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        const sourceIndex = parseInt(e.dataTransfer.getData("text/plain"));
-        onDrop(sourceIndex, index);
-      }}
-    >
-      {isEditing ? (
-        <form onSubmit={onEditSubmit} className="space-y-3">
-          <input
-            type="text"
-            name="editText"
-            value={editText}
-            onChange={onEditChange}
-            className="w-full rounded border p-2"
-            placeholder="Item title"
-          />
-          <div className="space-y-2">
-            <textarea
-              name="editClue"
-              value={editClue}
-              onChange={onEditChange}
-              onPaste={async (e) => {
-                const items = e.clipboardData.items;
-                for (let item of items) {
-                  if (item.type.startsWith("image")) {
-                    e.preventDefault();
-                    const file = item.getAsFile();
-                    if (file) {
-                      await handleImageUpload(file, editClue, onEditChange);
-                    }
-                    break;
-                  }
-                }
-              }}
-              className="h-32 w-full rounded border p-2 font-mono text-sm"
-              placeholder="Add details with Markdown..."
-            />
-            <div className="flex space-x-2">
-              <label className="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">
-                📁 Add Image
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      await handleImageUpload(file, editClue, onEditChange);
-                    }
-                  }}
-                />
-              </label>
-              <label className="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">
-                📷 Take Photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      await handleImageUpload(file, editClue, onEditChange);
-                    }
-                  }}
-                />
-              </label>
-            </div>
-          </div>
-          <div className="flex space-x-2">
-            <button
-              type="submit"
-              className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="flex items-start gap-4">
-          {isMobile ? (
-            <PositionSelector
-              currentPosition={index}
-              totalItems={totalItems}
-              onReorder={(from, to) => onListDrop(from, to)} // Use onListDrop here
-            />
-          ) : (
-            <div className="flex items-center gap-2">
-              <FaBars className="cursor-move text-gray-400" />
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white">
-                {index + 1}
-              </div>
-            </div>
-          )}
-          <div
-            className="flex-grow cursor-pointer"
-            onClick={() => onItemClick(index)}
-          >
-            <div className="flex text-start justify-between">
-              <span className="text-lg font-medium">{item.text}</span>
-              <div className="flex items-center space-x-2">
-                <div className="relative group">
-                  <FaMapMarkerAlt
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMapClick(index);
-                    }}
-                    className={`cursor-pointer transition-colors duration-200 ${
-                      isSelectedForMapping
-                        ? "text-yellow-500"
-                        : item.location != null
-                          ? "text-blue-500"
-                          : "text-gray-400"
-                    }`}
-                  />
-                  {item.location && (
-                    <div className="absolute -top-8 right-0 hidden group-hover:block">
-                      <div className="rounded bg-gray-800 px-2 py-1 text-xs text-white whitespace-nowrap">
-                        [{item.location.lat.toFixed(4)},{" "}
-                        {item.location.lng.toFixed(4)}]
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <FaPencilAlt
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEditClick();
-                  }}
-                  className="cursor-pointer text-gray-400 hover:text-blue-500 transition-colors duration-200"
-                />
-                <FaTrash
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                  className="cursor-pointer text-gray-400 hover:text-red-500 transition-colors duration-200"
-                />
-              </div>
-            </div>
-            {item.clue && (
-              <div className="mt-3 prose prose-sm max-w-none border-t pt-3 text-start">
-                <ReactMarkdown
-                  urlTransform={(value) => {
-                    // If it's a stored image URL, leave it as is
-                    if (value.startsWith("stored:")) return value;
-                    // Otherwise, use the original urlTransform behavior
-                    return value;
-                  }}
-                >
-                  {item.clue}
-                </ReactMarkdown>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </li>
-  );
-};
-
 function App() {
   const [items, setItems] = useState([]);
+  const [projectId, setProjectId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [newItemName, setNewItemName] = useState("");
   const [editIndex, setEditIndex] = useState(null);
@@ -690,31 +268,45 @@ function App() {
   const itemsContainerRef = useRef(null);
 
   useEffect(() => {
-    const loadItems = async () => {
-      const loadedItems = await loadFromStorage();
-      setItems(loadedItems);
-      // Auto-select first item if we have items and nothing is selected
-      if (loadedItems.length > 0 && !selectedId) {
-        setSelectedId(loadedItems[0].id);
-      }
-      setIsLoading(false);
-    };
-    loadItems();
+    const storedId = getStoredProjectId();
+    if (storedId) {
+      setProjectId(storedId);
+    } else {
+      const newId = generateProjectId();
+      setStoredProjectId(newId);
+      setProjectId(newId);
+    }
   }, []);
 
   useEffect(() => {
-    if (!isLoading) {
-      console.log("Triggering save for items:", items.length);
-      // Ensure we're saving the complete item objects
+    if (projectId) {
+      const loadItems = async () => {
+        const loadedItems = await loadFromStorage(projectId);
+        setItems(loadedItems);
+        setIsLoading(false);
+      };
+      loadItems();
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!isLoading && projectId) {
+      console.log("Saving items for project:", projectId);
       const itemsToSave = items.map((item) => ({
         id: item.id,
         text: item.text,
-        clue: item.clue || "", // Ensure clue is at least an empty string
+        clue: item.clue || "",
         location: item.location,
       }));
-      saveToStorage(itemsToSave).catch(console.error);
+      saveToStorage(itemsToSave, projectId).catch(console.error);
     }
-  }, [items, isLoading]);
+  }, [items, isLoading, projectId]);
+
+  const loadProject = (newProjectId) => {
+    setStoredProjectId(newProjectId);
+    setProjectId(newProjectId);
+    setIsLoading(true);
+  };
 
   const handleImageUpload = async (file, editClue, onEditChange) => {
     try {
@@ -988,6 +580,8 @@ function App() {
             onImport={handleImport}
             onReset={handleReset}
             items={items}
+            projectId={projectId}
+            onLoadProject={loadProject}
           />
         </div>
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
@@ -1043,6 +637,8 @@ function App() {
         onImport={handleImport}
         onReset={handleReset}
         items={items}
+        projectId={projectId}
+        onLoadProject={loadProject}
       />
       <MobileDrawer
         items={items}

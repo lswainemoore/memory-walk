@@ -1,11 +1,20 @@
 import { kv } from "@vercel/kv";
 import { NextResponse } from "next/server";
 
-const ITEMS_KEY = "items";
-
-export async function GET() {
+export async function GET(request) {
   try {
-    const items = await kv.get(ITEMS_KEY);
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get("project");
+
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "Project ID required" },
+        { status: 400 }
+      );
+    }
+
+    const key = `project:${projectId}:items`;
+    const items = await kv.get(key);
     return NextResponse.json(items || []);
   } catch (error) {
     console.error("Error fetching items:", error);
@@ -18,8 +27,19 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get("project");
+
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "Project ID required" },
+        { status: 400 }
+      );
+    }
+
     const items = await request.json();
-    await kv.set(ITEMS_KEY, items);
+    const key = `project:${projectId}:items`;
+    await kv.set(key, items);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error saving items:", error);
