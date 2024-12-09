@@ -39,17 +39,27 @@ const setStoredProjectId = (projectId) => {
 //   }
 // };
 
-const saveToStorage = async (items, projectId) => {
+const saveToStorage = async (items, projectId, expectedModifiedTime) => {
   try {
     const currentTime = new Date().toISOString();
+    let created = currentTime;
 
-    // Get existing data to preserve created time if it exists
-    const existingData = await loadFromStorage(projectId);
-    const createdTime = existingData?.created || currentTime;
+    if (expectedModifiedTime) {
+      // Only do the version check if we have an expectedModifiedTime
+      const currentData = await loadFromStorage(projectId);
+      if (currentData?.modified !== expectedModifiedTime) {
+        console.log("Version mismatch:", {
+          expected: expectedModifiedTime,
+          actual: currentData?.modified,
+        });
+        throw new Error("Data has been modified since last fetch");
+      }
+      created = currentData?.created || currentTime;
+    }
 
     const data = {
       items: items,
-      created: createdTime,
+      created,
       modified: currentTime,
     };
 
@@ -65,8 +75,7 @@ const saveToStorage = async (items, projectId) => {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const result = await response.json();
-    return result;
+    return { success: true, modified: currentTime };
   } catch (error) {
     console.error("Error saving to storage:", error);
     throw error;
@@ -223,6 +232,7 @@ const MapEventHandler = ({ onMapClick, onMapDrop }) => {
 
 function App() {
   const [items, setItems] = useState([]);
+  const [lastModified, setLastModified] = useState(null);
   const [projectId, setProjectId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [newItemName, setNewItemName] = useState("");
@@ -249,8 +259,8 @@ function App() {
   useEffect(() => {
     const loadItems = async () => {
       const data = await loadFromStorage(projectId);
-      // Extract items from the data structure
       setItems(data?.items || []);
+      setLastModified(data?.modified || null);
       setIsLoading(false);
     };
     if (projectId) {
@@ -267,9 +277,21 @@ function App() {
         clue: item.clue || "",
         location: item.location,
       }));
-      saveToStorage(itemsToSave, projectId).catch(console.error);
+      saveToStorage(itemsToSave, projectId, lastModified)
+        .then((result) => {
+          setLastModified(result.modified); // Update lastModified after successful save
+        })
+        .catch((error) => {
+          if (error.message === "Data has been modified since last fetch") {
+            alert(
+              "This project has been modified elsewhere. Please refresh to get the latest version."
+            );
+          } else {
+            console.error(error);
+          }
+        });
     }
-  }, [items, isLoading, projectId]);
+  }, [items, isLoading, projectId]); // lastModified not in deps to avoid thrashing
 
   const loadProject = (newProjectId) => {
     setStoredProjectId(newProjectId);
