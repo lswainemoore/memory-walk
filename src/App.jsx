@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { parse } from 'csv-parse/sync';
+import L from 'leaflet';
 
 import {
   MapContainer,
@@ -228,6 +229,38 @@ const MapEventHandler = ({ onMapClick, onMapDrop }) => {
       onMapClick(e);
     },
   });
+
+  return null;
+};
+
+const MapBoundsHandler = ({ items }) => {
+  const map = useMap();
+  const hasFramed = useRef(false);
+
+  useEffect(() => {
+    // Only frame the map if we haven't done it yet and we have items with locations
+    if (!hasFramed.current) {
+      const itemsWithLocations = items.filter(item => item.location);
+      
+      if (itemsWithLocations.length > 0) {
+        // Create bounds object from all marker positions
+        const bounds = itemsWithLocations.reduce((bounds, item) => {
+          const latLng = [item.location.lat, item.location.lng];
+          return bounds.extend(latLng);
+        }, new L.LatLngBounds(
+          [itemsWithLocations[0].location.lat, itemsWithLocations[0].location.lng]
+        ));
+        
+        // Fit the map to the bounds with some padding
+        map.fitBounds(bounds, {
+          padding: [50, 50],
+          maxZoom: 16
+        });
+        
+        hasFramed.current = true;
+      }
+    }
+  }, [items, map]);
 
   return null;
 };
@@ -555,6 +588,7 @@ function App() {
             onMapClick={handleMapClick}
             onMapDrop={handleMapDrop}
           />
+          <MapBoundsHandler items={items} />
           {items.map(
             (item) =>
               item?.location && (
