@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { parse } from 'csv-parse/sync';
 
 import {
   MapContainer,
@@ -229,6 +230,38 @@ const MapEventHandler = ({ onMapClick, onMapDrop }) => {
   });
 
   return null;
+};
+
+const importCsv = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const records = parse(text, {
+          skip_empty_lines: true,
+          trim: true,
+          columns: false,
+          from: 2  // Skip the header row
+        });
+        
+        const items = records
+          .filter(row => row[0]) // Filter out rows with empty first column
+          .map(row => createItem(
+            row[0],           // text
+            row[1] || ''     // clue (optional)
+          ));
+        
+        resolve(items);
+      } catch (error) {
+        reject(new Error('Error parsing CSV file'));
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Error reading file'));
+    reader.readAsText(file);
+  });
 };
 
 function App() {
@@ -541,7 +574,19 @@ function App() {
       <div className="hidden md:block md:w-1/3 bg-white p-6 shadow-xl overflow-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-4xl font-bold text-gray-800">Memory Lane</h1>
-          <ControlButtons projectId={projectId} onLoadProject={loadProject} />
+          <ControlButtons 
+            projectId={projectId} 
+            onLoadProject={loadProject}
+            onImportCsv={async (file) => {
+              try {
+                const newItems = await importCsv(file);
+                setItems(prevItems => [...prevItems, ...newItems]);
+              } catch (error) {
+                console.error('Import failed:', error);
+                alert('Failed to import CSV: ' + error.message);
+              }
+            }}
+          />
         </div>
         <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
           <form onSubmit={handleSubmit} className="flex space-x-4">
